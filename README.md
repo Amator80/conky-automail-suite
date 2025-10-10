@@ -21,7 +21,7 @@ Pakiet oferuje pełne wsparcie dla wielu kont e-mail (do 5), dynamiczne przełą
 *   [Wymagania](#wymagania)
 *   [Instalacja i Konfiguracja](#instalacja-i-konfiguracja)
 *   [Użytkowanie i Zarządzanie](#użytkowanie-i-zarządzanie)
-*   [Rozwiązywanie problemów](#rozwiazywanie-problemów)
+*   [Rozwiązywanie problemów](#rozwiązywanie-problemów)
 *   [FAQ - Najczęściej Zadawane Pytania](#faq---najczęściej-zadawane-pytania)
 *   [Kompatybilność](#kompatybilność)
 *   [Autorzy i Kontakt](#autorzy-i-kontakt)
@@ -158,7 +158,7 @@ Po uruchomieniu przez `3.START_skryptów_oraz_conky.sh`, system działa w pełni
 
 ---
 
-## Rozwiązywanie problemów
+### Rozwiązywanie problemów
 
 Jeśli napotkasz problemy, sprawdź pliki logów w katalogu `log/`:
 
