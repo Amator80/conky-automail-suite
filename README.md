@@ -133,6 +133,7 @@ Proces instalacji jest w pełni zautomatyzowany dzięki interaktywnym skryptom.
 ### Konfiguracja Ręczna (Dla Zaawansowanych)
 Chociaż zalecane jest użycie menedżera graficznego, możesz ręcznie edytować plik `config/config.json`. Upewnij się, że struktura pliku JSON pozostaje poprawna.
 
+![Zrzut ekranu działania skryptu](screenshot3.png)
 
 ---
 ## Użytkowanie i Zarządzanie
