@@ -23,7 +23,6 @@ Pakiet oferuje pełne wsparcie dla wielu kont e-mail (do 5), dynamiczne przełą
 *   [Użytkowanie i Zarządzanie](#użytkowanie-i-zarządzanie)
 *   [Rozwiązywanie problemów](#rozwiazywanie-problemów)
 *   [FAQ - Najczęściej Zadawane Pytania](#faq---najczęściej-zadawane-pytania)
-*   [Roadmap / Przyszłe Plany](#roadmap--przyszłe-plany)
 *   [Kompatybilność](#kompatybilność)
 *   [Autorzy i Kontakt](#autorzy-i-kontakt)
 *   [Wkład i Licencja](#wkład-i-licencja)
@@ -84,19 +83,21 @@ Projekt wykorzystuje modułową architekturę, w której każdy komponent ma jas
 *   **Conky** (z bindingami Lua): Do dynamicznego wyświetlania na pulpicie.
 *   **Lua**: Skryptowanie logiki i renderowania widżetu Conky (frontend).
 *   **Python 3**: Wielowątkowy demon do komunikacji IMAP i przetwarzania danych (backend).
-*   **Bash & YAD**: Skrypty instalacyjne i graficzne narzędzia zarządzające.
+*   **Bash**: Skrypty instalacyjne i narzędzia zarządzające.
+*   **YAD & Zenity**: Używane do tworzenia wszystkich graficznych interfejsów użytkownika (GUI) dla narzędzi konfiguracyjnych i zarządzających.
 *   **jq**: Narzędzie do przetwarzania danych JSON z poziomu terminala.
 
 ## Wymagania
 
-Skrypt instalacyjny spróbuje automatycznie zainstalować zależności. Upewnij się, że masz w systemie:
+Instalacja jest w pełni zautomatyzowana. Do prawidłowego działania, projekt wymaga następujących komponentów, które zostaną zainstalowane przez skrypt `1.Instalacja_zależności_v2.sh`:
 *   `conky` (z wkompilowanym wsparciem dla Lua 5.3 lub 5.4)
 *   `python3`
 *   `lua` (w wersji zgodnej z Conky)
-*   `yad` (dla graficznych interfejsów)
-*   `jq` (do obsługi plików JSON)
-*   `wget` (do pobierania plików)
-*   `xrandr` (do centrowania okien, zwykle w `x11-xserver-utils`)
+*   `yad`
+*   `zenity`
+*   `jq`
+*   `wget`
+*   `xrandr` (zwykle w pakiecie `x11-xserver-utils`)
 *   `libnotify-bin` (dla `notify-send`)
 
 ## Instalacja i Konfiguracja
@@ -204,18 +205,6 @@ O: Każdy z tych języków został wybrany do zadania, w którym sprawdza się n
 *   **Python** to potężne narzędzie do zadań sieciowych. Jego stabilne biblioteki do obsługi IMAP, wielowątkowości i przetwarzania danych czynią go idealnym wyborem na niezawodne zaplecze (backend).
 *   **Lua** jest niezwykle lekka i szybka, co czyni ją oficjalnym i najlepszym językiem skryptowym do renderowania dynamicznej treści wewnątrz samego Conky (frontend).
 
----
-
-## Roadmap / Przyszłe Plany
-
-Projekt jest aktywnie rozwijany. Poniżej znajduje się lista pomysłów i planowanych funkcji:
-
-*   [ ] **System motywów:** Możliwość łatwego przełączania między predefiniowanymi motywami kolorystycznymi.
-*   [ ] **Więcej opcji układu:** Dodanie nowych, predefiniowanych layoutów w `Zmiana_pozycji_okna_conky_v3.sh`.
-*   [ ] **Integracja z kalendarzem:** Opcjonalne wyświetlanie nadchodzących wydarzeń.
-*   [ ] **Ulepszone powiadomienia:** Bardziej szczegółowe powiadomienia systemowe z podglądem treści.
-
-Masz własny pomysł? Utwórz zgłoszenie (issue) i opisz go!
 
 ---
 
