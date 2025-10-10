@@ -171,39 +171,67 @@ Plik logów Conky może być generowany w głównym katalogu projektu lub w logu
 
 ## FAQ - Najczęściej Zadawane Pytania
 
-**P: Uruchomiłem skrypt, ale nic się nie wyświetla na pulpicie. Co robić?**
+Ta sekcja odpowiada na najczęstsze pytania dotyczące konfiguracji, personalizacji i filozofii projektu.
 
-O: To najczęstszy problem. Wykonaj następujące kroki:
+---
 
-1.  **Sprawdź logi:** Uruchom skrypty ręcznie w terminalu (`python3 py/python_mail_conky_lua.py` oraz `conky -c conkyrc_mail`) i obserwuj komunikaty błędów. Sprawdź także plik `log/mail_diag.json`.
-2.  **Sprawdź procesy:** Otwórz terminal i wpisz `ps aux | grep mail_fetcher.py`. Powinieneś zobaczyć działający proces Pythona. Następnie wpisz `ps aux | grep conky`. Również powinieneś zobaczyć proces Conky.
-3.  **Uruchom ręcznie:** Spróbuj uruchomić Conky bezpośrednio z terminala komendą `bash 3.START_skryptów_oraz_conky.sh` i obserwuj, czy w terminalu pojawiają się jakieś błędy.
+**Skonfigurowałem konto, ale widżet nie wyświetla żadnych maili. Co powinienem sprawdzić?**
 
-**P: Nie mogę zalogować się na konto Gmail/Google, widzę błąd hasła, chociaż jest ono poprawne.**
+Najczęstszą przyczyną są dane logowania. Sprawdź kolejno:
+1.  **Hasło do Aplikacji:** Upewnij się, że używasz specjalnego "hasła do aplikacji", zwłaszcza dla usług takich jak Gmail, Outlook czy iCloud. Zwykłe hasło do konta nie zadziała.
+2.  **Dane Serwera IMAP:** Sprawdź, czy adres serwera (`host`) i port (`port`) w menedżerze kont są poprawne dla Twojego dostawcy poczty.
+3.  **Status Konta:** Otwórz `menager_kont.sh` i upewnij się, że konto, które chcesz wyświetlić, ma status "Aktywne".
 
-O: Google wymaga używania specjalnych "haseł do aplikacji" dla programów zewnętrznych. Nie możesz użyć swojego głównego hasła do konta!
+---
 
-1.  Wejdź na stronę zarządzania kontem Google.
-2.  Włącz weryfikację dwuetapową (jeśli jeszcze jej nie masz).
+**Dlaczego potrzebuję "hasła do aplikacji" dla konta Gmail i jak je utworzyć?**
+
+Google, w celach bezpieczeństwa, wymaga używania unikalnych haseł dla zewnętrznych aplikacji, które uzyskują dostęp do Twojego konta. Aby je wygenerować:
+1.  Wejdź na stronę zarządzania swoim kontem Google.
+2.  Upewnij się, że masz włączoną weryfikację dwuetapową.
 3.  Przejdź do sekcji "Hasła do aplikacji".
-4.  Wygeneruj nowe hasło, nazywając je np. "Conky" lub "Poczta Linux".
-5.  Skopiuj wygenerowane 16-znakowe hasło i wklej je w menedżerze kont (`menager_kont.sh`).
+4.  Wygeneruj nowe hasło, nazywając je np. "Conky AutoMail".
+5.  Skopiuj wygenerowane 16-znakowe hasło i wklej je w polu hasła w `menager_kont.sh`.
 
-**P: Widżet czasami "zamraża się" na chwilę. Czy to normalne?**
+---
 
-O: Krótkie "zamrożenie" może wystąpić podczas pierwszego uruchomienia lub przy problemach z siecią, gdy skrypt próbuje nawiązać połączenie. Dzięki wielowątkowej architekturze, problem z jednym kontem nie powinien jednak blokować pozostałych na dłuższą metę. Jeśli problem jest uporczywy, sprawdź swoje połączenie internetowe.
+**Czy widżet działa na systemach Windows lub macOS?**
 
-**P: Jak mogę zmienić wygląd widżetu (czcionki, kolory, układ)?**
+Nie. Projekt został zaprojektowany od podstaw z myślą o środowisku Linux i opiera się na technologiach, które są dla niego natywne:
+*   **Conky** jest fundamentalnym elementem, który nie jest dostępny na Windows i macOS.
+*   Narzędzia graficzne **YAD** i **Zenity** są specyficzne dla ekosystemu Linuksa.
+*   Skrypty **Bash** są głęboko zintegrowane z systemem.
 
-O: Cała "magia" wyglądu znajduje się w pliku `lua/e-mail.lua`. Plik ten jest obszernie skomentowany. Możesz w nim zmieniać niemal wszystko: od rodzaju i rozmiaru czcionek, przez kolory poszczególnych elementów, po odstępy i ogólny układ wyświetlanych informacji.
+Dlatego widżet nie jest i nie będzie kompatybilny z systemami Windows i macOS.
 
-**P: Dlaczego projekt używa jednocześnie Pythona, Lua i Basha?**
+---
 
-O: Każdy z tych języków został wybrany do zadania, w którym sprawdza się najlepiej:
+**Jak mogę przełączać widok między pojedynczym kontem a podsumowaniem wszystkich kont?**
 
-*   **Bash ze wsparciem YAD** jest idealny do tworzenia prostych, natywnych skryptów instalacyjnych i narzędzi z graficznym interfejsem.
-*   **Python** to potężne narzędzie do zadań sieciowych. Jego stabilne biblioteki do obsługi IMAP, wielowątkowości i przetwarzania danych czynią go idealnym wyborem na niezawodne zaplecze (backend).
-*   **Lua** jest niezwykle lekka i szybka, co czyni ją oficjalnym i najlepszym językiem skryptowym do renderowania dynamicznej treści wewnątrz samego Conky (frontend).
+Służy do tego główne narzędzie projektu. Uruchom `menager_kont.sh` i kliknij przycisk "Wybierz konta". Otworzy się okno, w którym możesz zdecydować, czy chcesz widzieć podsumowanie wszystkich aktywnych kont, czy tylko jedno lub kilka wybranych. Zmiana jest widoczna natychmiast.
+
+---
+
+**Jak mogę dostosować wygląd widżetu?**
+
+Masz do dyspozycji dwa poziomy personalizacji:
+*   **Szczegółowy Wygląd:** Wszystkie aspekty wizualne, takie jak czcionki, kolory, odstępy, ikony i animacje, kontrolujesz w pliku `lua/e-mail.lua`. Jest on bogato komentowany, aby ułatwić modyfikacje.
+*   **Ogólny Układ:** Do szybkiej zmiany pozycji widżetu na ekranie (np. z dolnego lewego rogu na górny prawy) służy dedykowane narzędzie graficzne `Zmiana_pozycji_okna_conky_v3.sh`.
+
+---
+
+**Dlaczego projekt wykorzystuje aż trzy różne języki programowania (Python, Lua, Bash)?**
+
+Taka architektura to świadomy wybór, podyktowany filozofią "użyj najlepszego narzędzia do danego zadania":
+*   **Python** został wybrany dla backendu ze względu na jego potężne biblioteki sieciowe, stabilną obsługę IMAP oraz zaawansowane możliwości wielowątkowości, co gwarantuje wydajność i odporność na błędy.
+*   **Lua** to oficjalny i najwydajniejszy język do renderowania grafiki i logiki wewnątrz Conky. Jest niezwykle lekka i szybka, idealna do zadań frontendu.
+*   **Bash** w połączeniu z **YAD** i **Zenity** to idealne rozwiązanie do tworzenia prostych, natywnych dla systemu skryptów instalacyjnych i graficznych narzędzi pomocniczych.
+
+---
+
+**Czy przechowywanie haseł w pliku konfiguracyjnym jest bezpieczne?**
+
+Twoje hasła są przechowywane lokalnie na Twoim komputerze w pliku `config/config.json`, wewnątrz katalogu domowego. Projekt nie wysyła ich nigdzie indziej niż bezpośrednio do serwera IMAP Twojego dostawcy poczty. Za bezpieczeństwo pliku odpowiadają standardowe uprawnienia systemu plików Linuksa.
 
 
 ---
