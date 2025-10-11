@@ -1,6 +1,8 @@
 # Conky AutoMail Suite - Zaawansowany Widżet Pocztowy z Obsługą Wielu Kont
 
-z
+![Licencja:GPL v3](https://img.shields.io/badge/Licencja-GPL_v3-blue.svg)
+![wersja](https://img.shields.io/badge/Wersja-1.0.0-brightgreen)
+![Utrzymywany?](https://img.shields.io/badge/Utrzymywany%3F-Tak-green.svg)
 
 ![Zrzut ekranu działania skryptu](screenshot.png)
 
