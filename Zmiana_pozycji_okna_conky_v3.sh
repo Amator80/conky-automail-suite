@@ -1,5 +1,10 @@
 #!/bin/bash
 cd "$(dirname "$(readlink -f "$0")")"
+CACHE_DIR="/tmp/conky-automail-suite"
+
+# Utwórz katalog, jeśli nie istnieje
+mkdir -p "$CACHE_DIR"
+
 exec 200>/tmp/conky-automail-suite/.myconkyluadir.lock
 flock -n 200 || { echo "Inna instancja skryptu działa!"; exit 1; }
 
@@ -100,4 +105,3 @@ notify-send "Mail_python_amator80" "Ustawiono LAYOUT_MODE: $SELECTED, alignment:
 
 sleep 1
 rm -f /tmp/conky-automail-suite/.myconkyluadir.lock
-
