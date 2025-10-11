@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# Automatycznie wykryj katalog projektu na podstawie lokalizacji skryptu
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}" )" && pwd)"
+CONKY_CONF="$PROJECT_DIR/conkyrc_mail"
+
+# 1. Usuwamy plik cache maili
+rm -f /tmp/last_seen_mails.json
+
+# 2. Zabijamy Conky z tym configiem
+pid=$(pgrep -f "conky.*$CONKY_CONF")
+if [[ -n "$pid" ]]; then
+    kill "$pid"
+    # Czekamy aż proces zniknie, max 30 x 0.1s = 3 sekundy
+    for i in {1..30}; do
+        sleep 0.1
+        if ! ps -p "$pid" > /dev/null; then
+            break
+        fi
+    done
+fi
+
+# 3. Startujemy ponownie Conky
+conky -c "$CONKY_CONF" &
+
+exit 0
