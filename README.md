@@ -1,8 +1,6 @@
 # Conky AutoMail Suite - Zaawansowany Widżet Pocztowy z Obsługą Wielu Kont
 
-![Licencja:GPL v3](https://img.shields.io/badge/Licencja-GPL_v3-blue.svg)
-![wersja](https://img.shields.io/badge/Wersja-1.1.0-brightgreen)
-![Utrzymywany?](https://img.shields.io/badge/Utrzymywany%3F-Tak-green.svg)
+![Licencja:GPL v3](https://img.shields.io/badge/Licencja-GPL_v3-blue.svg)![wersja](https://img.shields.io/badge/Wersja-1.1.0-brightgreen)![Utrzymywany?](https://img.shields.io/badge/Utrzymywany%3F-Tak-green.svg)
 
 ![Zrzut ekranu działania skryptu](screenshot.png)
 
@@ -53,10 +51,11 @@ System został zbudowany w oparciu o trzy fundamentalne zasady:
 
 ### System Multi-Konto i Zarządzanie
 *   **Obsługa do 5 kont IMAP**: Monitoruj wszystkie swoje skrzynki w jednym miejscu.
+*   **Rozszerzona kompatybilność IMAP**: Pełne wsparcie dla obu standardów szyfrowania połączeń: SSL/TLS oraz STARTTLS.
 *   **Aliasy i kolory kont**: Łatwo identyfikuj maile dzięki unikalnym nazwom i kolorom dla każdego konta.
-*   **Graficzny menedżer kont (`menager_kont.sh`)**: Interaktywnie dodawaj, edytuj, włączaj i wyłączaj konta w locie.
+*   **Graficzny menedżer kont (`menager_kont.sh`)**: Interaktywnie dodawaj, edytuj, włączaj i wyłączaj konta, wybierając przy tym odpowiedni typ szyfrowania.
 *   **Dynamiczny selektor widoku**: Przełączaj widok Conky między podsumowaniem wszystkich kont a widokiem jednej lub kilku wybranych skrzynek.
-*   **Zarządzanie pocztą z pulpitu (`zarzadzaj-pocztą.sh`)**: Wykonuj zbiorcze akcje (oznacz jako przeczytane, usuń) na wielu kontach jednocześnie.
+*   **Zaawansowane zarządzanie pocztą z pulpitu (`zarzadzaj-pocztą.sh`)**: Wykonuj zbiorcze akcje (oznacz jako przeczytane, usuń) na wszystkich, najnowszych lub najstarszych wiadomościach, z możliwością ustawienia osobnego limitu dla każdego konta.
 
 ### Funkcjonalność Widżetu
 *   **Szczegółowe informacje o mailach**: Nadawca, temat oraz wieloliniowy, konfigurowalny podgląd treści.
@@ -145,11 +144,11 @@ Po uruchomieniu przez `3.START_skryptów_oraz_conky.sh`, system działa w pełni
 
 ### Zarządzanie Kontami i Widokiem
 
-*   `menager_kont.sh`: Główne narzędzie do zarządzania. Pozwala edytować dane logowania, aktywować/deaktywować konta oraz wybierać, które konta mają być aktualnie widoczne na pulpicie (wszystkie czy wybrane).
+*   `menager_kont.sh`: Główne narzędzie do zarządzania. Pozwala edytować dane logowania (w tym typ szyfrowania), aktywować/deaktywować konta oraz wybierać, które konta mają być aktualnie widoczne na pulpicie (wszystkie czy wybrane).
 
 ### Zaawansowane Akcje
 
-*   `zarzadzaj-pocztą.sh`: Umożliwia wykonanie operacji na wielu wiadomościach jednocześnie, takich jak oznaczenie wszystkich jako przeczytane czy opróżnienie kosza na wybranym koncie.
+*   `zarzadzaj-pocztą.sh`: Interaktywne narzędzie do wykonywania zaawansowanych operacji na wiadomościach. Pozwala na wykonanie wielu akcji w jednej sesji oraz precyzyjne określenie zakresu maili (np. "oznacz 20 najnowszych jako przeczytane").
 
 ### Personalizacja Wyglądu
 
@@ -196,7 +195,8 @@ Ta sekcja odpowiada na najczęstsze pytania dotyczące konfiguracji, personaliza
 Najczęstszą przyczyną są dane logowania. Sprawdź kolejno:
 1.  **Hasło do Aplikacji:** Upewnij się, że używasz specjalnego "hasła do aplikacji", zwłaszcza dla usług takich jak Gmail, Outlook czy iCloud. Zwykłe hasło do konta nie zadziała.
 2.  **Dane Serwera IMAP:** Sprawdź, czy adres serwera (`host`) i port (`port`) w menedżerze kont są poprawne dla Twojego dostawcy poczty.
-3.  **Status Konta:** Otwórz `menager_kont.sh` i upewnij się, że konto, które chcesz wyświetlić, ma status "Aktywne".
+3.  **Typ Szyfrowania:** Upewnij się, że w menedżerze kont wybrałeś odpowiedni typ szyfrowania (SSL lub STARTTLS) zgodny z wymaganiami Twojego dostawcy poczty.
+4.  **Status Konta:** Otwórz `menager_kont.sh` i upewnij się, że konto, które chcesz wyświetlić, ma status "Aktywne".
 
 ---
 
@@ -224,7 +224,7 @@ Dlatego widżet nie jest i nie będzie kompatybilny z systemami Windows i macOS.
 
 **Jak mogę przełączać widok między pojedynczym kontem a podsumowaniem wszystkich kont?**
 
-Służy do tego główne narzędzie projektu. Uruchom `menager_kont.sh` i kliknij przycisk "Wybierz konta". Otworzy się okno, w którym możesz zdecydować, czy chcesz widzieć podsumowanie wszystkich aktywnych kont, czy tylko jedno lub kilka wybranych. Zmiana jest widoczna natychmiast.
+Służy do tego główne narzędzie projektu. Uruchom `menager_kont.sh` i kliknij przycisk "Wybierz konta". Otworzy się okno, w którym możesz zdecydować, czy chcesz widzieć podsumowanie wszystkich aktywnych kont, czy tylko jedno lub kilka wybranych. Zmiana jest widocna natychmiast.
 
 ---
 
