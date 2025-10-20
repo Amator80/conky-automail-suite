@@ -1,0 +1,952 @@
+[
+  {
+    "imap_uid_search_s_total": 0.024958412002888508,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.09703241099487059,
+    "parse_msg_s_total": 0.005590548003965523,
+    "preview_total_s_total": 0.01703779798845062,
+    "preview_clean_html_s_total": 0.01533265699254116,
+    "attachments_check_s_total": 0.0015786900039529428,
+    "extract_ip_s_total": 1.8647988326847553e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.04748694699810585,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.15021021500433562,
+    "parse_msg_s_total": 0.005157968000276014,
+    "preview_total_s_total": 0.011891056994500104,
+    "preview_clean_html_s_total": 0.010470836998138111,
+    "attachments_check_s_total": 0.0010659460021997802,
+    "extract_ip_s_total": 0.00011641099263215438,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.002378044002398383
+  },
+  {
+    "imap_uid_search_s_total": 0.16691544798959512,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.08088786200096365,
+    "parse_msg_s_total": 0.005287476997182239,
+    "preview_total_s_total": 0.020512688002781942,
+    "preview_clean_html_s_total": 0.019145860998833086,
+    "attachments_check_s_total": 0.0014773910079384223,
+    "extract_ip_s_total": 2.134699752787128e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.03679927300254349,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.09502590400370536,
+    "parse_msg_s_total": 0.005711686004360672,
+    "preview_total_s_total": 0.012598608002008405,
+    "preview_clean_html_s_total": 0.011114901994005777,
+    "attachments_check_s_total": 0.0011234659905312583,
+    "extract_ip_s_total": 0.00012681099906330928,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.0018912820014520548
+  },
+  {
+    "imap_uid_search_s_total": 0.12073223500192398,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.08203129299363354,
+    "parse_msg_s_total": 0.005759722989751026,
+    "preview_total_s_total": 0.017421632997866254,
+    "preview_clean_html_s_total": 0.015672350986278616,
+    "attachments_check_s_total": 0.0016959490167209879,
+    "extract_ip_s_total": 1.8147002265322953e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.030828620001557283,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.10687691500061192,
+    "parse_msg_s_total": 0.006984804007515777,
+    "preview_total_s_total": 0.0205084149929462,
+    "preview_clean_html_s_total": 0.01814197599014733,
+    "attachments_check_s_total": 0.0016648949967930093,
+    "extract_ip_s_total": 0.00019634500495158136,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.000718590003089048
+  },
+  {
+    "imap_uid_search_s_total": 0.11902000899863197,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.10009148899553111,
+    "parse_msg_s_total": 0.003585797006962821,
+    "preview_total_s_total": 0.008653830002003815,
+    "preview_clean_html_s_total": 0.007684421012527309,
+    "attachments_check_s_total": 0.000910747992747929,
+    "extract_ip_s_total": 1.7418999050278217e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.002507006000087131
+  },
+  {
+    "imap_uid_search_s_total": 0.03177738200611202,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.08476641000015661,
+    "parse_msg_s_total": 0.0068352999951457605,
+    "preview_total_s_total": 0.01965076600026805,
+    "preview_clean_html_s_total": 0.01784178300295025,
+    "attachments_check_s_total": 0.0023251260063261725,
+    "extract_ip_s_total": 0.00018814999930327758,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.12099667999427766,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.09395132799545536,
+    "parse_msg_s_total": 0.003501082996081095,
+    "preview_total_s_total": 0.008927549992222339,
+    "preview_clean_html_s_total": 0.007810930001141969,
+    "attachments_check_s_total": 0.0008769990090513602,
+    "extract_ip_s_total": 1.707499905023724e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.0023708169974270277
+  },
+  {
+    "imap_uid_search_s_total": 0.046852766994561534,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.08684608599287458,
+    "parse_msg_s_total": 0.005408124015957583,
+    "preview_total_s_total": 0.011571603004995268,
+    "preview_clean_html_s_total": 0.010064453999802936,
+    "attachments_check_s_total": 0.0011016950011253357,
+    "extract_ip_s_total": 0.00014810299762757495,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.07253234800009523,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.07296873800078174,
+    "parse_msg_s_total": 0.0060888729931320995,
+    "preview_total_s_total": 0.019809685996733606,
+    "preview_clean_html_s_total": 0.017805096998927183,
+    "attachments_check_s_total": 0.0016761080114520155,
+    "extract_ip_s_total": 1.8546998035162687e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.0018351600083406083
+  },
+  {
+    "imap_uid_search_s_total": 0.037867742001253646,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.08279505999962566,
+    "parse_msg_s_total": 0.0068350460060173646,
+    "preview_total_s_total": 0.019813736995274667,
+    "preview_clean_html_s_total": 0.017958017000637483,
+    "attachments_check_s_total": 0.0015638149925507605,
+    "extract_ip_s_total": 0.0001935190084623173,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.07210562700493028,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.07785214100294979,
+    "parse_msg_s_total": 0.003526968997903168,
+    "preview_total_s_total": 0.009389238002768252,
+    "preview_clean_html_s_total": 0.008193540001229849,
+    "attachments_check_s_total": 0.0009660679934313521,
+    "extract_ip_s_total": 1.793201226973906e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.00237017500330694
+  },
+  {
+    "imap_uid_search_s_total": 0.09181875699869124,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.11903583999810508,
+    "parse_msg_s_total": 0.0069728339949506335,
+    "preview_total_s_total": 0.021478691000083927,
+    "preview_clean_html_s_total": 0.019210286991437897,
+    "attachments_check_s_total": 0.001601638003194239,
+    "extract_ip_s_total": 0.00017671599198365584,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.1668938920047367,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.07684986700041918,
+    "parse_msg_s_total": 0.005885806989681441,
+    "preview_total_s_total": 0.017238827000255696,
+    "preview_clean_html_s_total": 0.015506155003095046,
+    "attachments_check_s_total": 0.0015742990071885288,
+    "extract_ip_s_total": 1.772700488800183e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.002735044006840326
+  },
+  {
+    "imap_uid_search_s_total": 0.037784227992233355,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.09210177099885186,
+    "parse_msg_s_total": 0.0077975949898245744,
+    "preview_total_s_total": 0.024383812997257337,
+    "preview_clean_html_s_total": 0.02230635399610037,
+    "attachments_check_s_total": 0.002026934002060443,
+    "extract_ip_s_total": 0.00022431300021708012,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.07188471300469246,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.08487794200482313,
+    "parse_msg_s_total": 0.0035219560013501905,
+    "preview_total_s_total": 0.009117146008065902,
+    "preview_clean_html_s_total": 0.008154055991326459,
+    "attachments_check_s_total": 0.0009285620035370812,
+    "extract_ip_s_total": 1.791799149941653e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.0025360190120409243
+  },
+  {
+    "imap_uid_search_s_total": 0.043887642001209315,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.07776991499849828,
+    "parse_msg_s_total": 0.0051963599980808794,
+    "preview_total_s_total": 0.013449074009258766,
+    "preview_clean_html_s_total": 0.012024307005049195,
+    "attachments_check_s_total": 0.0010572840037639253,
+    "extract_ip_s_total": 0.00011750499834306538,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.1669226829908439,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.08292284300114261,
+    "parse_msg_s_total": 0.0039006509905448183,
+    "preview_total_s_total": 0.008923683992179576,
+    "preview_clean_html_s_total": 0.008018505999643821,
+    "attachments_check_s_total": 0.0009168549950118177,
+    "extract_ip_s_total": 1.714199606794864e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.0006579949986189604
+  },
+  {
+    "imap_uid_search_s_total": 0.03775732500071172,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.09412715600046795,
+    "parse_msg_s_total": 0.00878683401242597,
+    "preview_total_s_total": 0.02625605099456152,
+    "preview_clean_html_s_total": 0.02395464099390665,
+    "attachments_check_s_total": 0.0020134190053795464,
+    "extract_ip_s_total": 0.00025282900605816394,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.002009691008424852
+  },
+  {
+    "imap_uid_search_s_total": 0.07177963899448514,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.07695152599626454,
+    "parse_msg_s_total": 0.004274974999134429,
+    "preview_total_s_total": 0.010839529008080717,
+    "preview_clean_html_s_total": 0.009378499999002088,
+    "attachments_check_s_total": 0.0012483440004871227,
+    "extract_ip_s_total": 3.290499444119632e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.048891355996602215,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.26924544199573575,
+    "parse_msg_s_total": 0.006815060005465057,
+    "preview_total_s_total": 0.0203310160068213,
+    "preview_clean_html_s_total": 0.01802299401606433,
+    "attachments_check_s_total": 0.001539351993415039,
+    "extract_ip_s_total": 0.0001885860037873499,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.0015137259979383089
+  },
+  {
+    "imap_uid_search_s_total": 0.07388607099710498,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.07286291199852712,
+    "parse_msg_s_total": 0.0035715639824047685,
+    "preview_total_s_total": 0.008939264000218827,
+    "preview_clean_html_s_total": 0.007890613000199664,
+    "attachments_check_s_total": 0.0009202090004691854,
+    "extract_ip_s_total": 1.7956001101993024e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.03776447699783603,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.09496523800044088,
+    "parse_msg_s_total": 0.006472305001807399,
+    "preview_total_s_total": 0.014014815002155956,
+    "preview_clean_html_s_total": 0.01214934499876108,
+    "attachments_check_s_total": 0.0016454829965368845,
+    "extract_ip_s_total": 0.0001585019999765791,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.0017850299991550855
+  },
+  {
+    "imap_uid_search_s_total": 0.11896684200473828,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.09786532800353598,
+    "parse_msg_s_total": 0.006371919997036457,
+    "preview_total_s_total": 0.02086128699738765,
+    "preview_clean_html_s_total": 0.018876989001000766,
+    "attachments_check_s_total": 0.001980771994567476,
+    "extract_ip_s_total": 1.929400605149567e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.044022955997206736,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.10776664599688957,
+    "parse_msg_s_total": 0.007290532987099141,
+    "preview_total_s_total": 0.01742132600338664,
+    "preview_clean_html_s_total": 0.01564549299655482,
+    "attachments_check_s_total": 0.0016920630005188286,
+    "extract_ip_s_total": 0.00017326999659417197,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.0021732680033892393
+  },
+  {
+    "imap_uid_search_s_total": 0.12096535899036098,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.08191741500195349,
+    "parse_msg_s_total": 0.003527184991980903,
+    "preview_total_s_total": 0.009556623997923452,
+    "preview_clean_html_s_total": 0.008399938997172285,
+    "attachments_check_s_total": 0.0009611639907234348,
+    "extract_ip_s_total": 1.7315986042376608e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.0029168750043027103
+  },
+  {
+    "imap_uid_search_s_total": 0.04475715600710828,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.09888980300456751,
+    "parse_msg_s_total": 0.005379967995395418,
+    "preview_total_s_total": 0.012290415994357318,
+    "preview_clean_html_s_total": 0.010764920996734872,
+    "attachments_check_s_total": 0.001088705008442048,
+    "extract_ip_s_total": 0.00012193600559839979,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.1690103429937153,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.11686572799953865,
+    "parse_msg_s_total": 0.003518289995554369,
+    "preview_total_s_total": 0.008937700004025828,
+    "preview_clean_html_s_total": 0.0080778090050444,
+    "attachments_check_s_total": 0.0009417080000275746,
+    "extract_ip_s_total": 1.8568993255030364e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.0024748479991103522
+  },
+  {
+    "imap_uid_search_s_total": 0.048681239008146804,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.2982587619990227,
+    "parse_msg_s_total": 0.005732357007218525,
+    "preview_total_s_total": 0.018219811987364665,
+    "preview_clean_html_s_total": 0.016566394006076735,
+    "attachments_check_s_total": 0.001469977003580425,
+    "extract_ip_s_total": 0.0001895340028568171,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.11964719200477703,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.07805284800269874,
+    "parse_msg_s_total": 0.005868898006156087,
+    "preview_total_s_total": 0.01863122099894099,
+    "preview_clean_html_s_total": 0.016895643006137107,
+    "attachments_check_s_total": 0.001674551000178326,
+    "extract_ip_s_total": 1.9266997696831822e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.0030469869889202528
+  },
+  {
+    "imap_uid_search_s_total": 0.031790009008545894,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.11207220299547771,
+    "parse_msg_s_total": 0.005166329006897286,
+    "preview_total_s_total": 0.012458912991860416,
+    "preview_clean_html_s_total": 0.010391478994279169,
+    "attachments_check_s_total": 0.0010781589953694493,
+    "extract_ip_s_total": 0.00011602099402807653,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.17202149500371888,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.10291575299925171,
+    "parse_msg_s_total": 0.003553047004970722,
+    "preview_total_s_total": 0.010136033000890166,
+    "preview_clean_html_s_total": 0.008999323988973629,
+    "attachments_check_s_total": 0.0009087200087378733,
+    "extract_ip_s_total": 1.764600892784074e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.0025193320034304634
+  },
+  {
+    "imap_uid_search_s_total": 0.07897428599972045,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.17509700899972813,
+    "parse_msg_s_total": 0.006686263004667126,
+    "preview_total_s_total": 0.021199262009758968,
+    "preview_clean_html_s_total": 0.019435170004726388,
+    "attachments_check_s_total": 0.001598135982931126,
+    "extract_ip_s_total": 0.00018407401512376964,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.11894670799665619,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.0919590679986868,
+    "parse_msg_s_total": 0.0056856759983929805,
+    "preview_total_s_total": 0.017446772995754145,
+    "preview_clean_html_s_total": 0.015658690994314384,
+    "attachments_check_s_total": 0.0015340489990194328,
+    "extract_ip_s_total": 1.8081991584040225e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.002733308996539563
+  },
+  {
+    "imap_uid_search_s_total": 0.03870206700230483,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.0941149790014606,
+    "parse_msg_s_total": 0.006426869011193048,
+    "preview_total_s_total": 0.018657929998880718,
+    "preview_clean_html_s_total": 0.01697514500847319,
+    "attachments_check_s_total": 0.001629599995794706,
+    "extract_ip_s_total": 0.00019779099966399372,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.16379219100781484,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.07809034200181486,
+    "parse_msg_s_total": 0.005679524991137441,
+    "preview_total_s_total": 0.01744130299630342,
+    "preview_clean_html_s_total": 0.015734150001662783,
+    "attachments_check_s_total": 0.0016201420003199019,
+    "extract_ip_s_total": 1.9379011064302176e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.0025622989996918477
+  },
+  {
+    "imap_uid_search_s_total": 0.03274834000330884,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.09926084799371893,
+    "parse_msg_s_total": 0.007835345997591503,
+    "preview_total_s_total": 0.019791730010183528,
+    "preview_clean_html_s_total": 0.017713509005261585,
+    "attachments_check_s_total": 0.0018428829789627343,
+    "extract_ip_s_total": 0.00018973799160448834,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.0026989879916072823
+  },
+  {
+    "imap_uid_search_s_total": 0.16702079799870262,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.08305220899637789,
+    "parse_msg_s_total": 0.003650061000371352,
+    "preview_total_s_total": 0.009546914996462874,
+    "preview_clean_html_s_total": 0.008394251002755482,
+    "attachments_check_s_total": 0.0009115069988183677,
+    "extract_ip_s_total": 1.8310995073989034e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.03573553699970944,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.22215296899958048,
+    "parse_msg_s_total": 0.007749129013973288,
+    "preview_total_s_total": 0.02016893900145078,
+    "preview_clean_html_s_total": 0.018130688993551303,
+    "attachments_check_s_total": 0.0017466349963797256,
+    "extract_ip_s_total": 0.00018794299830915406,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.002732341003138572
+  },
+  {
+    "imap_uid_search_s_total": 0.166889396001352,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.09987737399933394,
+    "parse_msg_s_total": 0.003777910998906009,
+    "preview_total_s_total": 0.008953744996688329,
+    "preview_clean_html_s_total": 0.007989469006133731,
+    "attachments_check_s_total": 0.0010717709956225008,
+    "extract_ip_s_total": 1.7646001651883125e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.04459706399939023,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.09810586600360693,
+    "parse_msg_s_total": 0.005876610011910088,
+    "preview_total_s_total": 0.014018817004398443,
+    "preview_clean_html_s_total": 0.012291725011891685,
+    "attachments_check_s_total": 0.0012886029944638722,
+    "extract_ip_s_total": 0.00012360398250166327,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.0026563709980109707
+  },
+  {
+    "imap_uid_search_s_total": 0.11814367099577794,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.10001776099670678,
+    "parse_msg_s_total": 0.006698560995573644,
+    "preview_total_s_total": 0.023842151007556822,
+    "preview_clean_html_s_total": 0.0211418200051412,
+    "attachments_check_s_total": 0.0017135360030806623,
+    "extract_ip_s_total": 1.8627986719366163e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.03877191600622609,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.09315078999497928,
+    "parse_msg_s_total": 0.005877704999875277,
+    "preview_total_s_total": 0.011565711996809114,
+    "preview_clean_html_s_total": 0.009887093998258933,
+    "attachments_check_s_total": 0.001345900003798306,
+    "extract_ip_s_total": 0.00012409900955390185,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.0030230049960664473
+  },
+  {
+    "imap_uid_search_s_total": 0.12034364500141237,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.29464746799931163,
+    "parse_msg_s_total": 0.003590017993701622,
+    "preview_total_s_total": 0.00962267199793132,
+    "preview_clean_html_s_total": 0.008008288998098578,
+    "attachments_check_s_total": 0.0009386820020154119,
+    "extract_ip_s_total": 1.6472004062961787e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.001951446000020951
+  },
+  {
+    "imap_uid_search_s_total": 0.04637852399901021,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.08751314599794568,
+    "parse_msg_s_total": 0.009229100003722124,
+    "preview_total_s_total": 0.026414854008180555,
+    "preview_clean_html_s_total": 0.023973445990122855,
+    "attachments_check_s_total": 0.0019900800034520216,
+    "extract_ip_s_total": 0.000272982993919868,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.11985413900401909,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.09009529099421343,
+    "parse_msg_s_total": 0.005252700007986277,
+    "preview_total_s_total": 0.01285858299524989,
+    "preview_clean_html_s_total": 0.011095943998952862,
+    "attachments_check_s_total": 0.0015023430096334778,
+    "extract_ip_s_total": 1.8582992197480053e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.0018229009947390296
+  },
+  {
+    "imap_uid_search_s_total": 0.03787111499696039,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.10111676700034877,
+    "parse_msg_s_total": 0.005954501008091029,
+    "preview_total_s_total": 0.011044706996472087,
+    "preview_clean_html_s_total": 0.009385468998516444,
+    "attachments_check_s_total": 0.0012775310096913017,
+    "extract_ip_s_total": 0.00011976201494690031,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.1169517089947476,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.09818512500351062,
+    "parse_msg_s_total": 0.005521789986232761,
+    "preview_total_s_total": 0.01694860601128312,
+    "preview_clean_html_s_total": 0.015187004013569094,
+    "attachments_check_s_total": 0.0016160400045919232,
+    "extract_ip_s_total": 1.880100171547383e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.001477271995099727
+  },
+  {
+    "imap_uid_search_s_total": 0.022524834996147547,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.10427767699729884,
+    "parse_msg_s_total": 0.006134481001936365,
+    "preview_total_s_total": 0.01216844000009587,
+    "preview_clean_html_s_total": 0.01055933500174433,
+    "attachments_check_s_total": 0.0013251170021248981,
+    "extract_ip_s_total": 0.00012054799299221486,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.16894794099789578,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.08308715000021039,
+    "parse_msg_s_total": 0.0057061649931711145,
+    "preview_total_s_total": 0.017265990987652913,
+    "preview_clean_html_s_total": 0.015498771994316485,
+    "attachments_check_s_total": 0.0016873270069481805,
+    "extract_ip_s_total": 0.00013861000479664654,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.0017050230017048307
+  },
+  {
+    "imap_uid_search_s_total": 0.2140578690014081,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.23108713400142733,
+    "parse_msg_s_total": 0.007643511002243031,
+    "preview_total_s_total": 0.020454815996345133,
+    "preview_clean_html_s_total": 0.018433796001772862,
+    "attachments_check_s_total": 0.0017328140020254068,
+    "extract_ip_s_total": 0.00018411599739920348,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.12083783500565914,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.0889049530014745,
+    "parse_msg_s_total": 0.0023317789964494295,
+    "preview_total_s_total": 0.009444149989576545,
+    "preview_clean_html_s_total": 0.008490961998177227,
+    "attachments_check_s_total": 0.0008667059955769219,
+    "extract_ip_s_total": 2.4774999474175274e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.001993681005842518
+  },
+  {
+    "imap_uid_search_s_total": 0.0368232690016157,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.09395824799867114,
+    "parse_msg_s_total": 0.00590017201466253,
+    "preview_total_s_total": 0.012924520997330546,
+    "preview_clean_html_s_total": 0.011282764011411928,
+    "attachments_check_s_total": 0.0012942480025230907,
+    "extract_ip_s_total": 0.00012791299377568066,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.11912269599997671,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.07496902599814348,
+    "parse_msg_s_total": 0.0035511119931470603,
+    "preview_total_s_total": 0.008862313006829936,
+    "preview_clean_html_s_total": 0.007840584999939892,
+    "attachments_check_s_total": 0.0009360670010210015,
+    "extract_ip_s_total": 1.86729957931675e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.003729595002369024
+  },
+  {
+    "imap_uid_search_s_total": 0.0919161240090034,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.28416322999692056,
+    "parse_msg_s_total": 0.005901808006456122,
+    "preview_total_s_total": 0.011935333997826092,
+    "preview_clean_html_s_total": 0.010293045990692917,
+    "attachments_check_s_total": 0.0012913469909108244,
+    "extract_ip_s_total": 0.00012171801063232124,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.003859104006551206
+  },
+  {
+    "imap_uid_search_s_total": 0.12101483900187304,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.08707926500210306,
+    "parse_msg_s_total": 0.0035766189903370105,
+    "preview_total_s_total": 0.00897012300993083,
+    "preview_clean_html_s_total": 0.008308658012538217,
+    "attachments_check_s_total": 0.00106786799733527,
+    "extract_ip_s_total": 1.6767007764428854e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.03955890399811324,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.11906346499745268,
+    "parse_msg_s_total": 0.010319468987290747,
+    "preview_total_s_total": 0.018292912012839224,
+    "preview_clean_html_s_total": 0.015302699008316267,
+    "attachments_check_s_total": 0.0023098030069377273,
+    "extract_ip_s_total": 0.00023384000087389722,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.0025465090075158514
+  },
+  {
+    "imap_uid_search_s_total": 0.1659024260006845,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.08992426400072873,
+    "parse_msg_s_total": 0.003980728986789472,
+    "preview_total_s_total": 0.01017455101100495,
+    "preview_clean_html_s_total": 0.008476215007249266,
+    "attachments_check_s_total": 0.0009323170015704818,
+    "extract_ip_s_total": 1.720200089039281e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.04747644200688228,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.18237744399812073,
+    "parse_msg_s_total": 0.00603620198671706,
+    "preview_total_s_total": 0.011870312002429273,
+    "preview_clean_html_s_total": 0.010221096003078856,
+    "attachments_check_s_total": 0.0013070299901301041,
+    "extract_ip_s_total": 0.0001214560033986345,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.0026041210076073185
+  },
+  {
+    "imap_uid_search_s_total": 0.12102833600511076,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.09485350899922196,
+    "parse_msg_s_total": 0.0036199760070303455,
+    "preview_total_s_total": 0.010559508998994716,
+    "preview_clean_html_s_total": 0.008901772001991048,
+    "attachments_check_s_total": 0.0009031599984155037,
+    "extract_ip_s_total": 2.084799052681774e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.029898434004280716,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.10505969900259515,
+    "parse_msg_s_total": 0.0057290889890282415,
+    "preview_total_s_total": 0.011663311001029797,
+    "preview_clean_html_s_total": 0.010068747993500438,
+    "attachments_check_s_total": 0.0012579470130731352,
+    "extract_ip_s_total": 0.00012000599963357672,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.0025611960008973256
+  },
+  {
+    "imap_uid_search_s_total": 0.1687311600035173,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.09898024600261124,
+    "parse_msg_s_total": 0.003592985995055642,
+    "preview_total_s_total": 0.009345663005660754,
+    "preview_clean_html_s_total": 0.007941918003780302,
+    "attachments_check_s_total": 0.0009758949890965596,
+    "extract_ip_s_total": 1.668800541665405e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.001867373997811228
+  },
+  {
+    "imap_uid_search_s_total": 0.028744834999088198,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.09520496500044828,
+    "parse_msg_s_total": 0.005708803990273736,
+    "preview_total_s_total": 0.01174024399369955,
+    "preview_clean_html_s_total": 0.010122676008904818,
+    "attachments_check_s_total": 0.001219885001773946,
+    "extract_ip_s_total": 0.00017142900469480082,
+    "geoip_calls": 6,
+    "geoip_cache_hits": 6,
+    "imap_per_uid_fallback": 0
+  },
+  {
+    "imap_uid_search_s_total": 0.16784256898972671,
+    "imap_batch_roundtrips": 1,
+    "imap_fetch_s_total": 0.10710326000116765,
+    "parse_msg_s_total": 0.006828140998550225,
+    "preview_total_s_total": 0.026976092987752054,
+    "preview_clean_html_s_total": 0.024901003984268755,
+    "attachments_check_s_total": 0.0018645109958015382,
+    "extract_ip_s_total": 2.2043997887521982e-05,
+    "geoip_calls": 1,
+    "geoip_cache_hits": 1,
+    "imap_per_uid_fallback": 0
+  }
+]
