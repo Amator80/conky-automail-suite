@@ -32,7 +32,7 @@ fi
 if [ ! -f "$CONFIG_PATH" ]; then
     # Okno błędu pozostaje stałe (fixed).
     yad --center --fixed --error \
-        --text="<b>Błąd: Nie znaleziono pliku konfiguracyjnego.</b>\n\nOczekiwana ścieżka:\n$CONFIG_PATH\n\nUpewnij się, że plik 'config.json' istnieje w katalogu 'config' obok skryptu." \
+        --text="<b>Błąd: Nie znaleziono pliku konfiguracyjego.</b>\n\nOczekiwana ścieżka:\n$CONFIG_PATH\n\nUpewnij się, że plik 'config.json' istnieje w katalogu 'config' obok skryptu." \
         --width=800
     exit 1
 fi
@@ -145,7 +145,7 @@ select_view() {
 #  FUNKCJA: edit_account()
 # ===================================================================================
 # Otwiera formularz do edycji szczegółów wybranego konta e-mail.
-# Pozwala zmienić status aktywacji, nazwę, host, port, login, hasło oraz kolor.
+# Pozwala zmienić status, nazwę, host, port, login, hasło, SZYFROWANIE oraz kolor.
 # Zmiany są zapisywane z powrotem do pliku config.json.
 # ===================================================================================
 edit_account() {
@@ -155,35 +155,46 @@ edit_account() {
 
     local INDEX=$((SLOT_NUM - 1))
 
+    # Krok 1: Wczytaj dane z JSON, w tym nowe pole 'encryption'
     local values
     mapfile -t values < <(jq -r \
         --argjson index "$INDEX" \
-        '.accounts[$index] | [ .enabled, .name, .host, .port, .login, .password, (.color // [255, 255, 255, 255] | .[0]), (.color // [255, 255, 255, 255] | .[1]), (.color // [255, 255, 255, 255] | .[2]), (.color // [255, 255, 255, 255] | .[3]) ] | .[]' \
+        '.accounts[$index] | [ .enabled, .name, .host, .port, .login, .password, .encryption, (.color // [255, 255, 255, 255] | .[0]), (.color // [255, 255, 255, 255] | .[1]), (.color // [255, 255, 255, 255] | .[2]), (.color // [255, 255, 255, 255] | .[3]) ] | .[]' \
         "$CONFIG_PATH")
 
+    # Krok 2: Przypisz wczytane wartości do zmiennych, uwzględniając przesunięcie
     local ENABLED=${values[0]}
-    local NAME=$( [ "${values[1]}" == "null" ] && echo "" || echo "${values[1]}" )
-    local HOST=$( [ "${values[2]}" == "null" ] && echo "" || echo "${values[2]}" )
-    local PORT=$( [ "${values[3]}" == "null" ] && echo "" || echo "${values[3]}" )
-    local LOGIN=$( [ "${values[4]}" == "null" ] && echo "" || echo "${values[4]}" )
-    local PASSWORD=$( [ "${values[5]}" == "null" ] && echo "" || echo "${values[5]}" )
-    local ALPHA=${values[6]}
-    local RED=${values[7]}
-    local GREEN=${values[8]}
-    local BLUE=${values[9]}
+    local NAME=$([ "${values[1]}" == "null" ] && echo "" || echo "${values[1]}")
+    local HOST=$([ "${values[2]}" == "null" ] && echo "" || echo "${values[2]}")
+    local PORT=$([ "${values[3]}" == "null" ] && echo "" || echo "${values[3]}")
+    local LOGIN=$([ "${values[4]}" == "null" ] && echo "" || echo "${values[4]}")
+    local PASSWORD=$([ "${values[5]}" == "null" ] && echo "" || echo "${values[5]}")
+    local ENCRYPTION=$([ "${values[6]}" == "null" ] && echo "SSL" || echo "${values[6]}") # Domyślnie SSL, jeśli brak
+    local ALPHA=${values[7]}
+    local RED=${values[8]}
+    local GREEN=${values[9]}
+    local BLUE=${values[10]}
     
     local COLOR_HEX=$(printf "#%02x%02x%02x" "$RED" "$GREEN" "$BLUE")
     local ALPHA_WITH_RANGE="$ALPHA!0..255..1"
-    local CHECKED_STATE=$( [ "$ENABLED" == "true" ] && echo "TRUE" || echo "FALSE" )
+    local CHECKED_STATE=$([ "$ENABLED" == "true" ] && echo "TRUE" || echo "FALSE")
+    
+    # Przygotuj opcje dla pola ComboBox w YAD. '^' oznacza wartość domyślną, '!' to separator.
+    local ENCRYPTION_OPTIONS
+    if [[ "$ENCRYPTION" == "STARTTLS" ]]; then
+        ENCRYPTION_OPTIONS="^STARTTLS!SSL"
+    else
+        ENCRYPTION_OPTIONS="^SSL!STARTTLS"
+    fi
 
-    # --- Definicja rozmiarów okna edycji konta ---
+    # --- Definicja rozmiarów okna edycji konta (zwiększona wysokość) ---
     local EDIT_WIN_WIDTH=650
-    local EDIT_WIN_HEIGHT=350
-    local EDIT_POS_X=$(( (SCREEN_WIDTH - EDIT_WIN_WIDTH) / 2 ))
-    local EDIT_POS_Y=$(( (SCREEN_HEIGHT - EDIT_WIN_HEIGHT) / 2 ))
+    local EDIT_WIN_HEIGHT=400
+    local EDIT_POS_X=$(((SCREEN_WIDTH - EDIT_WIN_WIDTH) / 2))
+    local EDIT_POS_Y=$(((SCREEN_HEIGHT - EDIT_WIN_HEIGHT) / 2))
 
     local EDIT_DATA
-    # Usunięto --fixed z okna formularza edycji, aby było skalowalne.
+    # Krok 3: Dodaj pole ComboBox ":CB" do formularza YAD
     EDIT_DATA=$(yad --form \
         --title="Edycja konta #$SLOT_NUM" \
         --width="$EDIT_WIN_WIDTH" --height="$EDIT_WIN_HEIGHT" \
@@ -192,39 +203,43 @@ edit_account() {
         --field="Nazwa konta (opis):" \
         --field="Host IMAP:" \
         --field="Port:" \
+        --field="Szyfrowanie:CB" \
         --field="Login (e-mail):" \
-        --field="Hasło:" \
+        --field="Hasło:VER" \
         --field="Kolor nazwy:CLR" \
         --field="Przezroczystość (0-255):NUM" \
-        "$CHECKED_STATE" "$NAME" "$HOST" "$PORT" "$LOGIN" "$PASSWORD" "$COLOR_HEX" "$ALPHA_WITH_RANGE")
+        "$CHECKED_STATE" "$NAME" "$HOST" "$PORT" "$ENCRYPTION_OPTIONS" "$LOGIN" "$PASSWORD" "$COLOR_HEX" "$ALPHA_WITH_RANGE")
     
     local EDIT_EXIT_STATUS=$?
     if [ $EDIT_EXIT_STATUS -eq 0 ]; then
-        local new_enabled new_name new_host new_port new_login new_password new_color_hex new_alpha
-        IFS='|' read -r new_enabled new_name new_host new_port new_login new_password new_color_hex new_alpha <<< "$EDIT_DATA"
+        # Krok 4: Odczytaj nową wartość 'new_encryption' z wyniku YAD
+        local new_enabled new_name new_host new_port new_encryption new_login new_password new_color_hex new_alpha
+        IFS='|' read -r new_enabled new_name new_host new_port new_encryption new_login new_password new_color_hex new_alpha <<< "$EDIT_DATA"
         
         local hex_clean=${new_color_hex#\#}
         local r=$((16#${hex_clean:0:2}))
         local g=$((16#${hex_clean:2:2}))
         local b=$((16#${hex_clean:4:2}))
         local alpha=$(printf "%.0f" "$new_alpha")
-        local new_enabled_json=$( [ "$new_enabled" == "TRUE" ] && echo "true" || echo "false" )
+        local new_enabled_json=$([ "$new_enabled" == "TRUE" ] && echo "true" || echo "false")
         
+        # Krok 5: Zaktualizuj pole 'encryption' w pliku JSON za pomocą jq
         jq \
             --argjson index "$INDEX" --argjson enabled "$new_enabled_json" --arg name "$new_name" \
             --argjson a "$alpha" --argjson r "$r" --argjson g "$g" --argjson b "$b" \
-            --arg host "$new_host" --arg port "$new_port" --arg login "$new_login" --arg password "$new_password" \
+            --arg host "$new_host" --arg port "$new_port" --arg encryption "$new_encryption" \
+            --arg login "$new_login" --arg password "$new_password" \
             '
             .accounts[$index].enabled = $enabled |
             .accounts[$index].name = (if $name == "" then null else $name end) |
             .accounts[$index].host = (if $host == "" then null else $host end) |
             .accounts[$index].port = (if $port == "" then null else ($port | tonumber) end) |
+            .accounts[$index].encryption = (if $encryption == "" then "SSL" else $encryption end) |
             .accounts[$index].login = (if $login == "" then null else $login end) |
             .accounts[$index].password = (if $password == "" then null else $password end) |
             .accounts[$index].color = [$a, $r, $g, $b]
             ' "$CONFIG_PATH" > "$CONFIG_PATH.tmp" && mv "$CONFIG_PATH.tmp" "$CONFIG_PATH"
 
-        # Okno informacyjne pozostaje stałe (fixed).
         yad --center --fixed --info --button="OK:0" --width=600 --text="Zmiany dla konta #$SLOT_NUM zostały zapisane!"
     fi
 }
@@ -265,8 +280,8 @@ while true; do
     WIN_HEIGHT=350
 
     # Obliczenie pozycji okna na środku ekranu.
-    POS_X=$(( (SCREEN_WIDTH - WIN_WIDTH) / 2 ))
-    POS_Y=$(( (SCREEN_HEIGHT - WIN_HEIGHT) / 2 ))
+    POS_X=$(((SCREEN_WIDTH - WIN_WIDTH) / 2))
+    POS_Y=$(((SCREEN_HEIGHT - WIN_HEIGHT) / 2))
     
     # Usunięto --fixed z głównego okna, aby było skalowalne.
     CHOICE=$(yad --list \

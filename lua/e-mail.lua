@@ -2,12 +2,12 @@
 --[[
 #####################################################
 #                                                   #
-#               KONFIGURACJA – TYLKO TUTAJ           #
+#               KONFIGURACJA – TYLKO TUTAJ          #
 #   Tutaj ustawiasz wszystko pod siebie – możesz    #
-#   zmieniać parametry czcionek, kolorów itd.      #
-#   Każda opcja ma komentarz co ustawia.           #
+#   zmieniać parametry czcionek, kolorów itd.       #
+#   Każda opcja ma komentarz co ustawia.            #
 #   Poniżej tej sekcji jest kod GŁÓWNY –            #
-#   tam nie grzeb jeśli nie wiesz co robisz!       #
+#   tam nie grzeb jeśli nie wiesz co robisz!        #
 #                                                   #
 #####################################################
 ]]
@@ -43,12 +43,12 @@ SHOW_MAIL_PREVIEW = true                    -- [true/false] Jeśli true, pokaże
 ------------------- DŹWIĘKI (nowa/znikająca wiadomość) -------------------
 NEW_MAIL_SOUND_ENABLE = true                                                     -- [true/false] Włącz dźwięk nowej wiadomości pocztowej
 MAIL_DISAPPEAR_SOUND_ENABLE = true                                               -- [true/false] Dźwięk przy znikaniu maila z listy
-NEW_MAIL_SOUND = "/home/linux/Pulpit/conky-automail-suite/sound/nowy_mail.wav"          -- Ścieżka do dźwięku nowej poczty (WAV)
-MAIL_DISAPPEAR_SOUND = "/home/linux/Pulpit/conky-automail-suite/sound/remove_mail.wav"  -- Ścieżka do dźwięku znikającego maila z listy (WAV)
+NEW_MAIL_SOUND = "/home/linux/conky-automail-suite/sound/nowy_mail.wav"          -- Ścieżka do dźwięku nowej poczty (WAV)
+MAIL_DISAPPEAR_SOUND = "/home/linux/conky-automail-suite/sound/remove_mail.wav"  -- Ścieżka do dźwięku znikającego maila z listy (WAV)
 
 ------------------- KOPERTA – IKONA GŁÓWNA -------------------
 SHOW_ENVELOPE_ICON = true                                                        -- [true/false] Pokazuj ikonę koperty
-ENVELOPE_IMAGE = "/home/linux/Pulpit/conky-automail-suite/icons/mail.png"               -- Ścieżka do obrazka koperty (PNG)
+ENVELOPE_IMAGE = "/home/linux/conky-automail-suite/icons/mail.png"               -- Ścieżka do obrazka koperty (PNG)
 
 ENVELOPE_SIZE = { w = 141 * GLOBAL_SCALE_FACTOR, h = 141 * GLOBAL_SCALE_FACTOR } -- Rozmiar (szerokość, wysokość) koperty w px
 
@@ -159,7 +159,7 @@ ATTACHMENT_ICON_SIZE = { w = 36 * GLOBAL_SCALE_FACTOR, h = 42 * GLOBAL_SCALE_FAC
 ATTACHMENT_ICON_OFFSET = { dx = -33 * GLOBAL_SCALE_FACTOR, dy = -15 * GLOBAL_SCALE_FACTOR }  -- Przesunięcie ikony względem nadawcy (x, y)
 ATTACHMENT_ICON_ANGLE = 0                     -- Obrót ikony (w stopniach)
 ATTACHMENT_ICON_MIRROR = false                -- [true/false] Lustrzane odbicie ikony
-ATTACHMENT_ICON_IMAGE = "/home/linux/Pulpit/conky-automail-suite/icons/spinacz1.png" -- Ścieżka do ikony (np. spinacz)
+ATTACHMENT_ICON_IMAGE = "/home/linux/conky-automail-suite/icons/spinacz1.png" -- Ścieżka do ikony (np. spinacz)
 
 ------------------- WŁASNY NAGŁÓWEK/NOTKA -------------------
 CUSTOM_TEXT_ENABLE = true                     -- [true/false] Czy wyświetlać własny tekst?
@@ -660,7 +660,7 @@ last_mail_json_ok = true
 return data
 end
 local function save_max_mails_to_file()
-    local count_file = "/home/linux/Pulpit/conky-automail-suite/config/mail_count.conf"
+    local count_file = "/home/linux/conky-automail-suite/config/mail_count.conf"
     local f = io.open(count_file, "w")
     if f then
         f:write(MAX_MAILS, "\n")
@@ -670,7 +670,7 @@ end
 save_max_mails_to_file()
 
 local function save_preview_lines_to_file()
-    local preview_file = "/home/linux/Pulpit/conky-automail-suite/config/mail_preview_lines.conf"
+    local preview_file = "/home/linux/conky-automail-suite/config/mail_preview_lines.conf"
     local f = io.open(preview_file, "w")
     if f then
         f:write(MAIL_PREVIEW_LINES, "\n")

@@ -105,3 +105,4 @@ notify-send "Mail_python_amator80" "Ustawiono LAYOUT_MODE: $SELECTED, alignment:
 
 sleep 1
 rm -f /tmp/conky-automail-suite/.myconkyluadir.lock
+

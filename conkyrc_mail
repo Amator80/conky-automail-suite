@@ -85,7 +85,7 @@ conky.config = {
 
     -- LUA, WTYCZKI I FUNKCJE ZEWNĘTRZNE
     
-    lua_load = '/home/linux/Pulpit/conky-automail-suite/lua/e-mail.lua',
+    lua_load = '/home/linux/conky-automail-suite/lua/e-mail.lua',
     lua_draw_hook_post = 'draw_mail_indicator',
 };
 

@@ -1111,66 +1111,73 @@ class InternetMonitor(threading.Thread):
 # ===============================================================
 
 class AccountWorker(threading.Thread):
-    def __init__(self, account_conf, global_config, internet_monitor_ref, diag_file_lock, global_running_event):
+    # ================== POCZĄTEK ZMIAN ==================
+    def __init__(self, account_conf, global_config, internet_monitor_ref, diag_file_lock, global_running_event, initial_state=None):
         super().__init__(daemon=True)
         self.account_conf = account_conf
-        self.global_config = global_config # args.max_mails, polling_interval itp.
+        self.global_config = global_config
         self.internet_monitor = internet_monitor_ref
         self.diag_file_lock = diag_file_lock
         self._global_running_event = global_running_event
         
         self._imap_conn = None
         self._connected = False
-        self.last_known_state = {
-            "account_name": account_conf.get("name", "Nieznane"),
-            "unread": 0,
-            "all": 0,
-            "unread_cache": 0, # Dodane, aby mieć pewność, że klucz istnieje
-            "mails": [],
-            "last_error": "Nie połączono"
-        }
+        
+        # Użyj przekazanego stanu (z poprzedniego wątku) lub stwórz nowy, domyślny
+        if initial_state:
+            self.last_known_state = initial_state
+            # Natychmiast zaktualizuj pola, które mogły się zmienić (alias i kolor)
+            self.last_known_state['account_name'] = account_conf.get("name", "Nieznane")
+            for mail in self.last_known_state.get('mails', []):
+                mail['color'] = account_conf.get("color")
+        else:
+            self.last_known_state = {
+                "account_name": account_conf.get("name", "Nieznane"),
+                "unread": 0,
+                "all": 0,
+                "unread_cache": 0,
+                "mails": [],
+                "last_error": "Nie połączono"
+            }
+        
         self._stop_event = threading.Event()
         self.login_id = self.account_conf.get("login") or "Nieznane"
         
-        # Ustaw timeout dla socketów, które będą używane przez imaplib w tym wątku
         socket.setdefaulttimeout(SOCKET_TIMEOUT)
         print(f"{C(f'[AccountWorker {self.login_id}]', 'purple')} Startuję wątek dla konta.")
+    # ================== KONIEC ZMIAN ==================
 
     def run(self):
         while self._global_running_event.is_set() and not self._stop_event.is_set():
             diag = {}
             current_loop_error = None
             
-            # Krok 1: Sprawdź globalny status internetu
             if not self.internet_monitor.online:
                 current_loop_error = f"Brak połączenia z internetem dla konta {self.login_id}. Próbuję ponownie za chwilę."
                 print(f"{C('[WARN]', 'red')} [AccountWorker {self.login_id}] {current_loop_error}")
-                self._disconnect_imap() # Upewnij się, że połączenie jest zamknięte
+                self._disconnect_imap()
                 self.last_known_state["last_error"] = current_loop_error
                 self._connected = False
-                time.sleep(5) # Krótka pauza przed ponowną próbą, gdy brak internetu
+                time.sleep(5)
                 continue
 
-            # Krok 2: Utrzymuj połączenie lub połącz się
             if not self._connected or self._imap_conn is None:
                 try:
                     self._connect_imap()
                     self._connected = True
-                    self.last_known_state["last_error"] = None # Połączono, błąd zresetowany
+                    self.last_known_state["last_error"] = None
                 except Exception as e:
                     current_loop_error = f"Błąd połączenia/logowania IMAP dla konta {self.login_id}: {e}"
                     print(f"{C('[ERROR]', 'red', 'bold')} [AccountWorker {self.login_id}] {current_loop_error}", file=sys.stderr)
                     self._connected = False
                     self.last_known_state["last_error"] = current_loop_error
                     self._disconnect_imap()
-                    time.sleep(SOCKET_TIMEOUT) # Dłuższa pauza przy problemach z połączeniem
+                    time.sleep(SOCKET_TIMEOUT)
                     continue
             
-            # Krok 3: Wyślij NOOP, aby utrzymać sesję i sprawdzić jej status
             try:
                 if self._imap_conn:
                     self._imap_conn.noop()
-                    # print(f"{C('[INFO]', 'gray')} [AccountWorker {self.login_id}] NOOP OK.")
             except (imaplib.IMAP4.error, socket.timeout, ConnectionRefusedError, socket.gaierror) as e:
                 current_loop_error = f"Połączenie IMAP zerwane dla konta {self.login_id} (NOOP failed): {e}"
                 print(f"{C('[WARN]', 'yellow')} [AccountWorker {self.login_id}] {current_loop_error}", file=sys.stderr)
@@ -1188,7 +1195,6 @@ class AccountWorker(threading.Thread):
                 time.sleep(SOCKET_TIMEOUT)
                 continue
 
-            # Krok 4: Pobierz maile (jeśli połączenie jest aktywne)
             try:
                 mails_result = get_last_mails_imap(
                     imap_conn=self._imap_conn,
@@ -1206,7 +1212,7 @@ class AccountWorker(threading.Thread):
                     "account_name": self.account_conf.get("name", "Nieznane"),
                     "unread": mails_result.get("unread", 0),
                     "all": mails_result.get("all", 0),
-                    "unread_cache": mails_result.get("unread_cache", 0), # Dodane
+                    "unread_cache": mails_result.get("unread_cache", 0),
                     "mails": mails_result.get("mails", []),
                     "last_error": None
                 }
@@ -1230,22 +1236,38 @@ class AccountWorker(threading.Thread):
                 if diag:
                     _append_diag_array(diag, self.global_config["diag_file"])
             
-            time.sleep(self.global_config["polling_interval"]) # Poczekaj przed kolejnym cyklem pollingu
+            time.sleep(self.global_config["polling_interval"])
 
-        self._disconnect_imap() # Rozłącz po zakończeniu pętli
+        self._disconnect_imap()
         print(f"{C(f'[AccountWorker {self.login_id}]', 'purple')} Zakończono działanie.")
 
     def _connect_imap(self):
+        encryption_type = self.account_conf.get("encryption", "ssl").lower()
+        host = self.account_conf["host"]
+        
+        if encryption_type == "starttls":
+            port = self.account_conf.get("port", 143)
+        else:
+            port = self.account_conf.get("port", 993)
+
         try:
-            conn = imaplib.IMAP4_SSL(self.account_conf["host"], self.account_conf["port"], timeout=SOCKET_TIMEOUT)
+            if encryption_type == "starttls":
+                print(f"{C('[INFO]', 'cyan')} [AccountWorker {self.login_id}] Łączenie z {host}:{port} (tryb STARTTLS)...")
+                conn = imaplib.IMAP4(host, port, timeout=SOCKET_TIMEOUT)
+                conn.starttls()
+            else:
+                print(f"{C('[INFO]', 'cyan')} [AccountWorker {self.login_id}] Łączenie z {host}:{port} (tryb SSL/TLS)...")
+                conn = imaplib.IMAP4_SSL(host, port, timeout=SOCKET_TIMEOUT)
+            
             conn.login(self.account_conf["login"], self.account_conf["password"])
             self._imap_conn = conn
             self._connected = True
             print(f"{C('[OK]', 'green')} [AccountWorker {self.login_id}] Połączono i zalogowano do IMAP.")
+
         except Exception as e:
             self._imap_conn = None
             self._connected = False
-            raise # Przekaż błąd do pętli run
+            raise
 
     def _disconnect_imap(self):
         if self._imap_conn:
@@ -1260,7 +1282,6 @@ class AccountWorker(threading.Thread):
 
     def stop(self):
         self._stop_event.set()
-        # Wątek sam się rozłączy po sprawdzeniu _stop_event
         print(f"{C(f'[AccountWorker {self.login_id}]', 'purple')} Sygnalizuję zatrzymanie wątku.")
 
 # ===============================================================
@@ -1275,8 +1296,7 @@ def manage_workers(current_workers, enabled_accounts_config, global_config, inte
     running_logins = {worker.login_id: worker for worker in current_workers}
     configured_logins = {acc['login']: acc for acc in enabled_accounts_config if acc.get('login')}
 
-    # --- Krok 1: Znajdź wątki do zatrzymania ---
-    # (konta, które są wyłączone lub usunięte z konfiguracji)
+    # Krok 1: Znajdź wątki do zatrzymania
     logins_to_stop = set(running_logins.keys()) - set(configured_logins.keys())
     for login in logins_to_stop:
         worker_to_stop = running_logins[login]
@@ -1284,7 +1304,7 @@ def manage_workers(current_workers, enabled_accounts_config, global_config, inte
         worker_to_stop.stop()
         current_workers.remove(worker_to_stop)
 
-    # --- Krok 2: Znajdź konta, dla których trzeba uruchomić nowe wątki ---
+    # Krok 2: Znajdź konta, dla których trzeba uruchomić nowe wątki
     logins_to_start = set(configured_logins.keys()) - set(running_logins.keys())
     for login in logins_to_start:
         account_conf = configured_logins[login]
@@ -1293,26 +1313,33 @@ def manage_workers(current_workers, enabled_accounts_config, global_config, inte
         new_worker.start()
         current_workers.append(new_worker)
         
-    # --- Krok 3: Restart wątków dla kont, których konfiguracja się zmieniła ---
+    # ================== POCZĄTEK ZMIAN ==================
+    # Krok 3: Restart wątków dla kont, których konfiguracja się zmieniła
     for login, worker in running_logins.items():
         if login in configured_logins:
             new_conf = configured_logins[login]
             old_conf = worker.account_conf
-            # Sprawdź WSZYSTKIE kluczowe pola, w tym alias i kolor
+            # Sprawdź kluczowe pola, w tym alias i kolor
             if (new_conf.get('host') != old_conf.get('host') or
                 new_conf.get('port') != old_conf.get('port') or
                 new_conf.get('password') != old_conf.get('password') or
-                new_conf.get('name') != old_conf.get('name') or
-                new_conf.get('color') != old_conf.get('color')):
+                new_conf.get('name') != old_conf.get('name') or # Alias
+                new_conf.get('color') != old_conf.get('color')): # Kolor
                 
                 print(f"{C('[MAIN]', 'orange')} Zmieniono konfigurację dla {login}. Restartuję wątek.")
-                # Zatrzymaj stary
+                
+                # Zachowaj ostatni znany stan, aby uniknąć "mrugania"
+                previous_state = worker.last_known_state.copy()
+                
+                # Zatrzymaj stary wątek
                 worker.stop()
                 current_workers.remove(worker)
-                # Uruchom nowy
-                restarted_worker = AccountWorker(new_conf, global_config, internet_monitor, diag_file_lock, global_running_event)
+                
+                # Uruchom nowy, przekazując mu odziedziczony stan
+                restarted_worker = AccountWorker(new_conf, global_config, internet_monitor, diag_file_lock, global_running_event, initial_state=previous_state)
                 restarted_worker.start()
                 current_workers.append(restarted_worker)
+    # ================== KONIEC ZMIAN ==================
 
     return current_workers
 
@@ -1364,17 +1391,6 @@ if __name__ == "__main__":
         "polling_interval": args.polling_interval
     }
 
-    def read_from_file(file_path, fallback_value):
-        try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                content = f.readline().strip()
-                if isinstance(fallback_value, int) and content.isdigit():
-                    val = int(content)
-                    return val if val > 0 else fallback_value
-                return content or fallback_value
-        except Exception:
-            return fallback_value
-
     _geoip_load_cache_file(args.geoip_cache)
 
     internet_monitor = InternetMonitor(GLOBAL_RUNNING_EVENT)
@@ -1394,9 +1410,8 @@ if __name__ == "__main__":
     last_cache_write_time = 0
     CACHE_AGGREGATION_INTERVAL = 1
     
-    # NOWY INTERWAŁ DO SPRAWDZANIA ZMIAN W KONFIGURACJI
     last_config_check_time = 0
-    CONFIG_CHECK_INTERVAL = 5 # Sprawdzaj config.json co 5 sekund
+    CONFIG_CHECK_INTERVAL = 5
 
     print(f"\n{C('[MAIN]', 'blue', 'bold')} Uruchomiono tryb daemona. Agreguję cache co {CACHE_AGGREGATION_INTERVAL}s. Sprawdzam zmiany w konfiguracji co {CONFIG_CHECK_INTERVAL}s.")
     print(f"{C('[MAIN]', 'blue', 'bold')} Naciśnij CTRL+C aby zatrzymać.")
@@ -1405,7 +1420,7 @@ if __name__ == "__main__":
         while GLOBAL_RUNNING_EVENT.is_set():
             current_time = time.time()
             
-            # --- SEKCJA ZARZĄDZANIA WORKERAMI ---
+            # Sekcja zarządzania workerami
             if current_time - last_config_check_time >= CONFIG_CHECK_INTERVAL:
                 try:
                     full_config = load_config(args.config)
@@ -1415,7 +1430,6 @@ if __name__ == "__main__":
                     
                     enabled_accounts = [acc for acc in accounts_list if acc.get("enabled", False)]
                     
-                    # Wywołaj funkcję do synchronizacji wątków
                     workers = manage_workers(workers, enabled_accounts, global_worker_config, internet_monitor, _diag_file_lock, GLOBAL_RUNNING_EVENT)
 
                 except Exception as e:
@@ -1423,7 +1437,7 @@ if __name__ == "__main__":
                 
                 last_config_check_time = current_time
 
-            # --- SEKCJA AGREGACJI I ZAPISU CACHE ---
+            # Sekcja agregacji i zapisu cache
             if current_time - last_cache_write_time >= CACHE_AGGREGATION_INTERVAL:
                 
                 aggregated_results = {}
@@ -1513,7 +1527,7 @@ if __name__ == "__main__":
                         else:
                             mail['is_new'] = False
                 
-                if internet_monitor.online and not any_network_failure_in_workers:
+                if internet_monitor.online:
                     safe_write_json(final_output_data, args.cache)
                     save_last_seen(list(current_uids_in_output))
                 
