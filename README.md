@@ -279,7 +279,7 @@ Projekt powinien działać na większości nowoczesnych dystrybucji Linuksa, kt�
 
 ### Powiązane projekty
 *   **Zupix_Py2Lua_Mail_conky** – bliźniaczy projekt autorstwa Zupixa.
-*    https://github.com/ZupixUI/Zupix_Py2Lua_Mail_conky
+*    https://github.com/ZupixUI/Zupix-Py2Lua-Mail-conky
 *    Uwaga: Oba projekty powstały niezależnie i prezentują odmienne podejścia do tematu, dlatego warto zapoznać się z oboma rozwiązaniami.
 
 ---
