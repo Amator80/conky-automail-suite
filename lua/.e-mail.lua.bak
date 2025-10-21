@@ -43,12 +43,12 @@ SHOW_MAIL_PREVIEW = true                    -- [true/false] Jeśli true, pokaże
 ------------------- DŹWIĘKI (nowa/znikająca wiadomość) -------------------
 NEW_MAIL_SOUND_ENABLE = true                                                     -- [true/false] Włącz dźwięk nowej wiadomości pocztowej
 MAIL_DISAPPEAR_SOUND_ENABLE = true                                               -- [true/false] Dźwięk przy znikaniu maila z listy
-NEW_MAIL_SOUND = "/home/linux/Pulpit/conky-automail-suite/sound/nowy_mail.wav"          -- Ścieżka do dźwięku nowej poczty (WAV)
-MAIL_DISAPPEAR_SOUND = "/home/linux/Pulpit/conky-automail-suite/sound/remove_mail.wav"  -- Ścieżka do dźwięku znikającego maila z listy (WAV)
+NEW_MAIL_SOUND = "/home/linux/conky-automail-suite/sound/nowy_mail.wav"          -- Ścieżka do dźwięku nowej poczty (WAV)
+MAIL_DISAPPEAR_SOUND = "/home/linux/conky-automail-suite/sound/remove_mail.wav"  -- Ścieżka do dźwięku znikającego maila z listy (WAV)
 
 ------------------- KOPERTA – IKONA GŁÓWNA -------------------
 SHOW_ENVELOPE_ICON = true                                                        -- [true/false] Pokazuj ikonę koperty
-ENVELOPE_IMAGE = "/home/linux/Pulpit/conky-automail-suite/icons/mail.png"               -- Ścieżka do obrazka koperty (PNG)
+ENVELOPE_IMAGE = "/home/linux/conky-automail-suite/icons/mail.png"               -- Ścieżka do obrazka koperty (PNG)
 
 ENVELOPE_SIZE = { w = 141 * GLOBAL_SCALE_FACTOR, h = 141 * GLOBAL_SCALE_FACTOR } -- Rozmiar (szerokość, wysokość) koperty w px
 
@@ -159,7 +159,7 @@ ATTACHMENT_ICON_SIZE = { w = 36 * GLOBAL_SCALE_FACTOR, h = 42 * GLOBAL_SCALE_FAC
 ATTACHMENT_ICON_OFFSET = { dx = -33 * GLOBAL_SCALE_FACTOR, dy = -15 * GLOBAL_SCALE_FACTOR }  -- Przesunięcie ikony względem nadawcy (x, y)
 ATTACHMENT_ICON_ANGLE = 0                     -- Obrót ikony (w stopniach)
 ATTACHMENT_ICON_MIRROR = false                -- [true/false] Lustrzane odbicie ikony
-ATTACHMENT_ICON_IMAGE = "/home/linux/Pulpit/conky-automail-suite/icons/spinacz1.png" -- Ścieżka do ikony (np. spinacz)
+ATTACHMENT_ICON_IMAGE = "/home/linux/conky-automail-suite/icons/spinacz1.png" -- Ścieżka do ikony (np. spinacz)
 
 ------------------- WŁASNY NAGŁÓWEK/NOTKA -------------------
 CUSTOM_TEXT_ENABLE = true                     -- [true/false] Czy wyświetlać własny tekst?
@@ -238,6 +238,15 @@ require 'cairo'
 CAIRO_FORMAT_ARGB32 = 0
 pcall(require, 'cairo_xlib')
 local json = require("dkjson")
+
+-- ###############################################################
+-- ### NOWY BLOK: INICJALIZACJA PANGO (dla emoji i tekstu) ###
+-- ###############################################################
+local lgi = require 'lgi'
+local Pango = lgi.Pango
+local PangoCairo = lgi.PangoCairo
+-- ###############################################################
+
 
 -----------------(Zupix FIX)-------------------
 -- BLOK LAYOUTÓW – pełna kontrola pozycji     --
@@ -451,101 +460,101 @@ function set_layout_by_mode()
     end
 end
 
+-- ####################################################################
+-- ### NOWE FUNKCJE POMOCNICZE OPARTE NA PANGO ###
+-- ####################################################################
 
-local function utf8_sub(s, i, j)
-    local pos = 1
-    local bytes = #s
-    local start, end_ = nil, nil
-    local k = 0
-    while pos <= bytes do
-        k = k + 1
-        if k == i then start = pos end
-        if k == (j and j + 1 or nil) then end_ = pos - 1 break end
-        local c = s:byte(pos)
-        if c < 0x80 then pos = pos + 1
-        elseif c < 0xE0 then pos = pos + 2
-        elseif c < 0xF0 then pos = pos + 3
-        else pos = pos + 4 end
+-- Tworzy i konfiguruje Pango Layout - podstawowy obiekt do pracy z tekstem
+local function create_pango_layout(cr, text, font_desc_str)
+    local layout = PangoCairo.create_layout(cr)
+    local font_desc = Pango.FontDescription.from_string(font_desc_str)
+    layout:set_font_description(font_desc)
+    layout:set_text(text, -1)
+    return layout
+end
+
+-- Mierzy szerokość tekstu (z pełnym wsparciem emoji)
+local function pango_text_width(cr, text, font_desc_str)
+    if not text or text == "" then return 0 end
+    local layout = create_pango_layout(cr, text, font_desc_str)
+    local width_pango, _ = layout:get_pixel_size()
+    return width_pango
+end
+
+-- Rysuje tekst (z pełnym wsparciem emoji)
+local function pango_draw_text(cr, text, x, y, font_desc_str, color)
+    if not text or text == "" then return end
+    
+    -- Ustawienie koloru w Cairo jest nadal potrzebne, Pango go nie dziedziczy
+    local r, g, b = decode_rgb3(color)
+    cairo_set_source_rgb(cr, r, g, b)
+
+    local layout = create_pango_layout(cr, text, font_desc_str)
+    cairo_move_to(cr, x, y)
+    PangoCairo.show_layout(cr, layout)
+end
+
+-- Rysuje tekst z automatycznym wielokropkiem, jeśli się nie mieści
+local function pango_draw_text_ellipsized(cr, text, x, y, max_width, font_desc_str, color)
+    if not text or text == "" then return end
+
+    local r, g, b = decode_rgb3(color)
+    cairo_set_source_rgb(cr, r, g, b)
+
+    local layout = create_pango_layout(cr, text, font_desc_str)
+    layout:set_width(max_width * Pango.SCALE)
+    layout:set_ellipsize(Pango.EllipsizeMode.END)
+    
+    cairo_move_to(cr, x, y)
+    PangoCairo.show_layout(cr, layout)
+end
+
+-- Rysuje tekst nadawcy z kolorowym aliasem, używając atrybutów Pango
+function pango_draw_colored_sender(cr, mail, text_to_draw, x, y, font_desc_str)
+    local layout = create_pango_layout(cr, text_to_draw, font_desc_str)
+    local alias_prefix = ""
+    local has_color_alias = false
+
+    if mail.account_name and mail.account_name ~= "" and mail.color and type(mail.color) == "table" then
+        local prefix_candidate = "[" .. mail.account_name .. "] "
+        if text_to_draw:sub(1, #prefix_candidate) == prefix_candidate then
+            alias_prefix = prefix_candidate
+            has_color_alias = true
+        end
     end
-    if start then return s:sub(start, end_ or bytes) end
-    return ""
+
+    local attrs = Pango.AttrList.new()
+
+    -- Domyślny kolor dla całego tekstu
+    local r_def, g_def, b_def = decode_rgb3(FROM_COLOR_CUSTOM)
+    local color_def = Pango.Attribute.new_foreground(r_def*65535, g_def*65535, b_def*65535)
+    color_def.start_index = 0
+    color_def.end_index = -1
+    attrs:insert(color_def)
+
+    -- Nadpisz kolor dla aliasu
+    if has_color_alias then
+        -- Zakładamy, że mail.color to {alfa, r, g, b}
+        local r, g, b = decode_rgb3({mail.color[2], mail.color[3], mail.color[4]})
+        local color_alias = Pango.Attribute.new_foreground(r*65535, g*65535, b*65535)
+        color_alias.start_index = 0
+        color_alias.end_index = #alias_prefix -- Długość w bajtach
+        attrs:insert(color_alias)
+    end
+
+    layout:set_attributes(attrs)
+    
+    cairo_move_to(cr, x, y)
+    PangoCairo.show_layout(cr, layout)
 end
 
-local function utf8_len(s)
-    local _, count = s:gsub("[^\128-\193]", "")
-    return count
-end
+-- ####################################################################
 
 local function safe_str(s, fallback)
     if s == nil then return fallback or "" end
     if type(s) == "string" then return s end
     return tostring(s)
 end
-
-local function set_font(cr, font_name, font_size, bold, italic)
-    cairo_select_font_face(
-        cr,
-        font_name,
-        italic and CAIRO_FONT_SLANT_ITALIC or CAIRO_FONT_SLANT_NORMAL,
-        bold and CAIRO_FONT_WEIGHT_BOLD or CAIRO_FONT_WEIGHT_NORMAL
-    )
-    cairo_set_font_size(cr, font_size)
-end
-
-local function split_emoji(text)
-    local res = {}
-    local pattern = "[\xF0-\xF7][\x80-\xBF][\x80-\xBF][\x80-\xBF]"
-    local last_end = 1
-    for start_pos, end_pos in function() return text:find(pattern, last_end) end do
-        if start_pos > last_end then
-            table.insert(res, {emoji=false, txt=text:sub(last_end, start_pos-1)})
-        end
-        table.insert(res, {emoji=true, txt=text:sub(start_pos, end_pos)})
-        last_end = end_pos + 1
-    end
-    if last_end <= #text then
-        table.insert(res, {emoji=false, txt=text:sub(last_end)})
-    end
-    return res
-end
-
--- Liczenie szerokości tekstu z emoji
-local function text_width_with_emoji(cr, text, font_name, font_size, font_bold, font_italic)
-    local width = 0
-    local emoji_chunks = split_emoji(text)
-    for idx, chunk in ipairs(emoji_chunks) do
-        if chunk.emoji then
-            cairo_select_font_face(cr, "Noto Color Emoji", CAIRO_FONT_SLANT_NORMAL, font_bold and CAIRO_FONT_WEIGHT_BOLD or CAIRO_FONT_WEIGHT_NORMAL)
-        else
-            cairo_select_font_face(cr, font_name, font_italic and CAIRO_FONT_SLANT_ITALIC or CAIRO_FONT_SLANT_NORMAL, font_bold and CAIRO_FONT_WEIGHT_BOLD or CAIRO_FONT_WEIGHT_NORMAL)
-        end
-        cairo_set_font_size(cr, font_size)
-        local ext2 = cairo_text_extents_t:create()
-        cairo_text_extents(cr, chunk.txt, ext2)
-        width = width + ext2.x_advance
-    end
-    return width
-end
-
--- Obcinanie tekstu z emoji do max_width
-local function trim_line_to_width_emoji(cr, text, max_width, font_name, font_size, font_bold, font_italic)
-    local ellipsis = "..."
-    local trimmed = ""
-    for i = 1, utf8_len(text) do
-        local chunk = utf8_sub(text, 1, i)
-        local w = text_width_with_emoji(cr, chunk .. ellipsis, font_name, font_size, font_bold, font_italic)
-        if w > max_width then
-            break
-        end
-        trimmed = chunk
-    end
-    -- Jeśli tekst się mieści, zwróć całość:
-    if text_width_with_emoji(cr, text, font_name, font_size, font_bold, font_italic) <= max_width then
-        return text
-    end
-    return trimmed .. ellipsis
-end
-
 
 -- Sprawdź, czy to pierwszy start po reboocie (nie ma pliku last_seen)
 local function file_exists(path)
@@ -611,34 +620,6 @@ local scroll_states = {
 local from_scroll_states = {}
 local meta_scroll_states = {}
 
--- [PATCH] Cache’y: szerokości, cięcia tekstu, preview i meta szerokości
-local width_cache = {}
-local trim_cache  = {}
-local meta_width_cache = {}
-
-local function cache_key_width(text, font, size, bold, italic)
-    return table.concat({text or "", font or "", size or 0, bold and "b" or "n", italic and "i" or "n"}, "|")
-end
-
-local function cached_text_width_emoji(cr, text, font, size, bold, italic)
-    local k = cache_key_width(text, font, size, bold, italic)
-    local w = width_cache[k]
-    if w then return w end
-    w = text_width_with_emoji(cr, text or "", font, size, bold, italic)
-    width_cache[k] = w
-    return w
-end
-
-local function cached_trim_emoji(cr, text, maxw, font, size, bold, italic)
-    local k = table.concat({text or "", maxw or 0, font or "", size or 0, bold and "b" or "n", italic and "i" or "n"}, "|")
-    local v = trim_cache[k]
-    if v then return v end
-    v = trim_line_to_width_emoji(cr, text or "", maxw, font, size, bold, italic)
-    trim_cache[k] = v
-    return v
-end
--- [/PATCH]
-
 local function fetch_mails_from_cache()
     local CACHE_FILE = "/tmp/conky-automail-suite/mail_cache.json"
     local f = io.open(CACHE_FILE, "r")
@@ -660,7 +641,7 @@ last_mail_json_ok = true
 return data
 end
 local function save_max_mails_to_file()
-    local count_file = "/home/linux/Pulpit/conky-automail-suite/config/mail_count.conf"
+    local count_file = "/home/linux/conky-automail-suite/config/mail_count.conf"
     local f = io.open(count_file, "w")
     if f then
         f:write(MAX_MAILS, "\n")
@@ -670,7 +651,7 @@ end
 save_max_mails_to_file()
 
 local function save_preview_lines_to_file()
-    local preview_file = "/home/linux/Pulpit/conky-automail-suite-newPY2/config/mail_preview_lines.conf"
+    local preview_file = "/home/linux/conky-automail-suite/config/mail_preview_lines.conf"
     local f = io.open(preview_file, "w")
     if f then
         f:write(MAIL_PREVIEW_LINES, "\n")
@@ -697,7 +678,6 @@ local function draw_png_rotated(cr, x, y, w, h, path, angle_deg, mirror_x)
     cairo_set_source_surface(cr, image, 0, 0)
     cairo_paint(cr)
     cairo_restore(cr)
-    -- NIE niszczymy surface, bo cache!
 end
 
 local function get_mail_id(mail)
@@ -705,35 +685,6 @@ local function get_mail_id(mail)
     local from = tostring(mail.from or ""):sub(1,32)
     local preview = tostring(mail.preview or ""):sub(1,32)
     return subj .. "|" .. from .. "|" .. preview
-end
-
-local function trim_line_to_width(cr, text, max_width)
-    local ellipsis = "..."
-    local ext_ellipsis = cairo_text_extents_t:create()
-    cairo_text_extents(cr, ellipsis, ext_ellipsis)
-    local ellipsis_width = ext_ellipsis.width
-
-    local trimmed = text
-    local total_width = 0
-    local last_good = ""
-
-    for i = 1, utf8_len(text) do
-        local chunk = utf8_sub(text, 1, i)
-        local ext = cairo_text_extents_t:create()
-        cairo_text_extents(cr, chunk .. ellipsis, ext)
-        if ext.width > max_width then
-            break
-        end
-        last_good = chunk
-    end
-
-    local ext_full = cairo_text_extents_t:create()
-    cairo_text_extents(cr, text, ext_full)
-    if ext_full.width <= max_width then
-        return text
-    end
-
-    return last_good .. ellipsis
 end
 
 -- DEKODER BEZPIECZNYCH WARTOŚCI RGB
@@ -776,26 +727,6 @@ local function set_color(cr, typ, custom)
     end
 end
 
-local function draw_emoji_text(cr, text, font_name, font_bold, font_size, x, y, font_italic)
-    if not text or text == "" then return 0 end
-    local cursor = x
-    local emoji_chunks = split_emoji(text)
-    for idx, chunk in ipairs(emoji_chunks) do
-        cairo_move_to(cr, cursor, y)
-        if chunk.emoji then
-            cairo_select_font_face(cr, "Noto Color Emoji", CAIRO_FONT_SLANT_NORMAL, font_bold and CAIRO_FONT_WEIGHT_BOLD or CAIRO_FONT_WEIGHT_NORMAL)
-        else
-            cairo_select_font_face(cr, font_name, font_italic and CAIRO_FONT_SLANT_ITALIC or CAIRO_FONT_SLANT_NORMAL, font_bold and CAIRO_FONT_WEIGHT_BOLD or CAIRO_FONT_WEIGHT_NORMAL)
-        end
-        cairo_set_font_size(cr, font_size)
-        cairo_show_text(cr, chunk.txt)
-        local ext2 = cairo_text_extents_t:create()
-        cairo_text_extents(cr, chunk.txt, ext2)
-        cursor = cursor + ext2.x_advance
-    end
-    return cursor - x
-end
-
 local function ease_out(t)
     return 1 - (1 - t) * (1 - t)
 end
@@ -820,8 +751,6 @@ local function get_mail_from_id(mail, from_txt)
     return from_base:sub(1,64) .. "|" .. subject:sub(1,64) .. "|" .. (from_txt or "")
 end
 
-print("[diag] conky_parse:", type(_G.conky_parse))
--- w okolicach definicji now_time() wstaw zamiast starej:
 local _tick_counter = 0
 local function now_time()
     local dt = (type(_G.conky_info) == "table" and tonumber(_G.conky_info.update_interval)) or 1
@@ -835,89 +764,42 @@ local function now_time()
     end
 end
 
--- ==================================================================================
--- POCZĄTEK MODYFIKACJI: Nowa funkcja do rysowania nadawcy z kolorowym aliasem
--- ==================================================================================
-local function draw_colored_sender(cr, mail, text_to_draw, x, y)
-    -- Ustawienia czcionki są już ustawione przez funkcję wywołującą
-    local font_name = FROM_FONT_NAME
-    local font_size = FROM_FONT_SIZE
-    local font_bold = FROM_FONT_BOLD
-    local font_italic = FROM_FONT_ITALIC
-
-    local alias_prefix = ""
-    local sender_part = text_to_draw
-    local has_color_alias = false
-
-    -- Sprawdź, czy mail ma alias i przypisany kolor
-    if mail.account_name and mail.account_name ~= "" and mail.color and type(mail.color) == "table" then
-        local prefix_candidate = "[" .. mail.account_name .. "] "
-        -- Sprawdź, czy tekst do narysowania faktycznie zaczyna się od tego aliasu
-        if text_to_draw:sub(1, #prefix_candidate) == prefix_candidate then
-            alias_prefix = prefix_candidate
-            sender_part = text_to_draw:sub(#prefix_candidate + 1)
-            has_color_alias = true
-        end
-    end
-
-    if has_color_alias then
-        -- 1. Narysuj alias z jego specyficznym kolorem
-        local a = (mail.color[1] or 255) / 255
-        local r = (mail.color[2] or 255) / 255
-        local g = (mail.color[3] or 255) / 255
-        local b = (mail.color[4] or 255) / 255
-        cairo_set_source_rgba(cr, r, g, b, a)
-        local alias_width = draw_emoji_text(cr, alias_prefix, font_name, font_bold, font_size, x, y, font_italic)
-
-        -- 2. Narysuj resztę tekstu nadawcy z domyślnym kolorem
-        set_color(cr, FROM_COLOR_TYPE, FROM_COLOR_CUSTOM)
-        draw_emoji_text(cr, sender_part, font_name, font_bold, font_size, x + alias_width, y, font_italic)
-    else
-        -- Jeśli nie ma aliasu lub koloru, narysuj cały tekst normalnie, z domyślnym kolorem
-        set_color(cr, FROM_COLOR_TYPE, FROM_COLOR_CUSTOM)
-        draw_emoji_text(cr, text_to_draw, font_name, font_bold, font_size, x, y, font_italic)
-    end
-end
--- ==================================================================================
--- KONIEC MODYFIKACJI
--- ==================================================================================
-
-
 -- ##################################################################################
--- ### POCZĄTEK ZMODYFIKOWANEGO BLOKU ###
+-- ### NOWA WERSJA `draw_from_scrolling` UŻYWAJĄCA PANGO ###
 -- ##################################################################################
 local function draw_from_scrolling(cr, mail, from_txt, x, y)
-    -- Pobranie parametrów z konfiguracji globalnej
     local maxw = FROM_MAX_WIDTH
     local scroll_enable = FROM_SCROLL_ENABLE and is_new_mail(mail)
-    local scroll_speed  = FROM_SCROLL_SPEED
-    local scroll_repeat = FROM_SCROLL_REPEAT
-    local scroll_delay  = FROM_SCROLL_DELAY
-    local scroll_ease   = FROM_SCROLL_EASE
-    local scroll_extra  = FROM_SCROLL_EXTRA
-    local font_name     = FROM_FONT_NAME
-    local font_bold     = FROM_FONT_BOLD
-    local font_size     = FROM_FONT_SIZE
-    local font_italic   = FROM_FONT_ITALIC
+    
+    local font_desc_str = string.format("%s %s %s %f", FROM_FONT_NAME, (FROM_FONT_ITALIC and "Italic" or ""), (FROM_FONT_BOLD and "Bold" or ""), FROM_FONT_SIZE)
+    local total_width = pango_text_width(cr, from_txt, font_desc_str)
 
-    -- Ustawienie czcionki do obliczeń szerokości
-    set_font(cr, font_name, font_size, font_bold, font_italic)
-
-    -- Obliczenie całkowitej szerokości tekstu nadawcy
-    local total_width = text_width_with_emoji(cr, from_txt, font_name, font_size, font_bold, font_italic)
-
-    -- --- PRZYPADEK 1: Tekst się mieści lub przewijanie jest wyłączone ---
     if total_width <= maxw or not scroll_enable then
-        local trimmed_text = trim_line_to_width_emoji(cr, from_txt, maxw, font_name, font_size, font_bold, font_italic)
-        -- Używamy funkcji pomocniczej, która już prawidłowo obsługuje kolory
-        draw_colored_sender(cr, mail, trimmed_text, x, y)
-        local final_width = text_width_with_emoji(cr, trimmed_text, font_name, font_size, font_bold, font_italic)
-        return x + final_width
+        local layout = create_pango_layout(cr, from_txt, font_desc_str)
+        layout:set_width(maxw * Pango.SCALE)
+        layout:set_ellipsize(Pango.EllipsizeMode.END)
+        
+        local attrs = Pango.AttrList.new()
+        local r_def, g_def, b_def = decode_rgb3(FROM_COLOR_CUSTOM)
+        local color_def = Pango.Attribute.new_foreground(r_def*65535, g_def*65535, b_def*65535)
+        attrs:insert(color_def)
+        if mail.account_name and mail.account_name ~= "" and mail.color then
+            local prefix_candidate = "[" .. mail.account_name .. "] "
+            if from_txt:sub(1, #prefix_candidate) == prefix_candidate then
+                local r, g, b = decode_rgb3({mail.color[2], mail.color[3], mail.color[4]})
+                local color_alias = Pango.Attribute.new_foreground(r*65535, g*65535, b*65535)
+                color_alias.end_index = #prefix_candidate
+                attrs:insert(color_alias)
+            end
+        end
+        layout:set_attributes(attrs)
+        
+        cairo_move_to(cr, x, y)
+        PangoCairo.show_layout(cr, layout)
+        
+        return x + math.min(total_width, maxw)
     end
 
-    -- --- PRZYPADEK 2: Tekst jest za długi i wymaga przewijania ---
-    
-    -- Pobranie/inicjalizacja stanu przewijania
     local mail_id = get_mail_from_id(mail, from_txt)
     local now = now_time()
     local state = from_scroll_states[mail_id]
@@ -926,149 +808,102 @@ local function draw_from_scrolling(cr, mail, from_txt, x, y)
         state = from_scroll_states[mail_id]
     end
 
-    -- Podział tekstu na statyczny alias i przewijaną część
-    local alias_prefix = ""
-    local sender_part = from_txt
-    local has_alias = false
+    local opt = {
+        scroll_speed = FROM_SCROLL_SPEED, scroll_repeat = FROM_SCROLL_REPEAT,
+        scroll_delay = FROM_SCROLL_DELAY, scroll_ease = FROM_SCROLL_EASE,
+        scroll_extra = FROM_SCROLL_EXTRA,
+    }
 
-    if mail.account_name and mail.account_name ~= "" then
-        local prefix_candidate = "[" .. mail.account_name .. "] "
-        if from_txt:sub(1, #prefix_candidate) == prefix_candidate then
-            alias_prefix = prefix_candidate
-            sender_part = from_txt:sub(#prefix_candidate + 1)
-            has_alias = true
-        end
-    end
-
-    -- Obliczenie szerokości poszczególnych części
-    local alias_width = 0
-    if has_alias then
-        alias_width = text_width_with_emoji(cr, alias_prefix, font_name, font_size, font_bold, font_italic)
-    end
-    local sender_width = text_width_with_emoji(cr, sender_part, font_name, font_size, font_bold, font_italic)
-
-    -- Zdefiniowanie obszaru rysowania dla części przewijanej
-    local sender_x = x + alias_width
-    local sender_max_w = maxw - alias_width
-    if sender_max_w < 0 then sender_max_w = 0 end -- Zabezpieczenie
-
-    -- Obliczenie parametrów animacji przewijania
-    local scroll_len = sender_width - sender_max_w + scroll_extra
+    local scroll_len = total_width - maxw + opt.scroll_extra
     if scroll_len < 1 then scroll_len = 1 end
-    
-    local delay_start  = scroll_delay or 0
-    local pause_end    = 1.0
-    local scroll_time  = math.max(scroll_len / (scroll_speed or (72 * GLOBAL_SCALE_FACTOR)), 0.5)
+    local scroll_time  = math.max(scroll_len / (opt.scroll_speed or 72), 0.5)
     local elapsed = now - state.start_time
     local phase = state.phase
-    local ease_func = scroll_ease or "linear"
-
-    -- --- Logika Rysowania ---
-
-    -- 1. Narysuj statyczny alias (jeśli istnieje)
-    if has_alias then
-        -- Ta część jest statyczna i rysowana poza jakimkolwiek obszarem przycinania
-        local a = (mail.color[1] or 255) / 255
-        local r = (mail.color[2] or 255) / 255
-        local g = (mail.color[3] or 255) / 255
-        local b = (mail.color[4] or 255) / 255
-        cairo_set_source_rgba(cr, r, g, b, a)
-        draw_emoji_text(cr, alias_prefix, font_name, font_bold, font_size, x, y, font_italic)
-    end
-
-    -- Ustawienie koloru dla części nadawcy
-    set_color(cr, FROM_COLOR_TYPE, FROM_COLOR_CUSTOM)
     
-    -- 2. Narysuj przewijaną część nadawcy w zależności od aktualnej fazy animacji
+    local offset = 0
     if phase == "start" then
-        if elapsed < delay_start then
-            -- Przed rozpoczęciem przewijania, pokaż przycięty tekst
-            local trimmed_sender = trim_line_to_width_emoji(cr, sender_part, sender_max_w, font_name, font_size, font_bold, font_italic)
-            draw_emoji_text(cr, trimmed_sender, font_name, font_bold, font_size, sender_x, y, font_italic)
-        else
-            -- Czas rozpocząć przewijanie
-            state.phase = "scroll"
-            state.start_time = now
-            -- Aby uniknąć migotania na 1 klatkę, narysuj pierwszą klatkę przewijania
-            cairo_save(cr)
-            cairo_rectangle(cr, sender_x, y - font_size, sender_max_w, font_size + (12 * GLOBAL_SCALE_FACTOR))
-            cairo_clip(cr)
-            draw_emoji_text(cr, sender_part, font_name, font_bold, font_size, sender_x, y, font_italic)
-            cairo_restore(cr)
-        end
-
+        if elapsed >= opt.scroll_delay then state.phase = "scroll"; state.start_time = now end
     elseif phase == "scroll" then
         local t = math.min(1, elapsed / scroll_time)
-        local ease_t = (ease_func == "easeOut") and ease_out(t) or t
-        local offset = ease_t * scroll_len
-        
-        cairo_save(cr)
-        cairo_rectangle(cr, sender_x, y - font_size, sender_max_w, font_size + (12 * GLOBAL_SCALE_FACTOR))
-        cairo_clip(cr)
-        draw_emoji_text(cr, sender_part, font_name, font_bold, font_size, sender_x - offset, y, font_italic)
-        cairo_restore(cr)
-        
-        if t >= 1 then
-            state.phase = "pause_end"
-            state.start_time = now
-        end
-        
+        local ease_t = (opt.scroll_ease == "easeOut") and ease_out(t) or t
+        offset = ease_t * scroll_len
+        if t >= 1 then state.phase = "pause_end"; state.start_time = now end
     elseif phase == "pause_end" then
-        if elapsed < pause_end then
-            -- Przytrzymaj tekst na końcu przewijania
-            cairo_save(cr)
-            cairo_rectangle(cr, sender_x, y - font_size, sender_max_w, font_size + (12 * GLOBAL_SCALE_FACTOR))
-            cairo_clip(cr)
-            draw_emoji_text(cr, sender_part, font_name, font_bold, font_size, sender_x - scroll_len, y, font_italic)
-            cairo_restore(cr)
-        else
-            -- Sprawdź, czy powtórzyć, czy zakończyć
+        offset = scroll_len
+        if elapsed >= 1.0 then
             state.rep = state.rep + 1
-            if state.rep < scroll_repeat then
-                state.phase = "start"
-                state.start_time = now
-            else
-                state.phase = "done"
+            if state.rep < opt.scroll_repeat then state.phase = "start"; state.start_time = now
+            else state.phase = "done" end
+        end
+    end
+
+    if phase == "done" or (phase == "start" and elapsed < opt.scroll_delay) then
+        local layout = create_pango_layout(cr, from_txt, font_desc_str)
+        layout:set_width(maxw * Pango.SCALE)
+        layout:set_ellipsize(Pango.EllipsizeMode.END)
+        local attrs = Pango.AttrList.new()
+        local r_def, g_def, b_def = decode_rgb3(FROM_COLOR_CUSTOM)
+        local color_def = Pango.Attribute.new_foreground(r_def*65535, g_def*65535, b_def*65535)
+        attrs:insert(color_def)
+        if mail.account_name and mail.account_name ~= "" and mail.color then
+            local prefix_candidate = "[" .. mail.account_name .. "] "
+            if from_txt:sub(1, #prefix_candidate) == prefix_candidate then
+                local r, g, b = decode_rgb3({mail.color[2], mail.color[3], mail.color[4]})
+                local color_alias = Pango.Attribute.new_foreground(r*65535, g*65535, b*65535)
+                color_alias.end_index = #prefix_candidate
+                attrs:insert(color_alias)
             end
         end
-        
-    elseif phase == "done" then
-        -- Przewijanie zakończone, ponownie pokaż przycięty tekst
-        local trimmed_sender = trim_line_to_width_emoji(cr, sender_part, sender_max_w, font_name, font_size, font_bold, font_italic)
-        draw_emoji_text(cr, trimmed_sender, font_name, font_bold, font_size, sender_x, y, font_italic)
+        layout:set_attributes(attrs)
+        cairo_move_to(cr, x, y)
+        PangoCairo.show_layout(cr, layout)
+    else
+        cairo_save(cr)
+        cairo_rectangle(cr, x, y - FROM_FONT_SIZE, maxw, FROM_FONT_SIZE + (12 * GLOBAL_SCALE_FACTOR))
+        cairo_clip(cr)
+        pango_draw_colored_sender(cr, mail, from_txt, x - offset, y, font_desc_str)
+        cairo_restore(cr)
     end
     
-    -- Zwróć maksymalną szerokość pola, aby temat wyrównał się poprawnie
     return x + maxw
 end
--- ##################################################################################
--- ### KONIEC ZMODYFIKOWANEGO BLOKU ###
--- ##################################################################################
 
-
+-- ##################################################################################
+-- ### NOWA WERSJA `draw_scrolling_text` UŻYWAJĄCA PANGO ###
+-- ##################################################################################
 local function draw_scrolling_text(cr, key, mail, text, x, y, maxw, font_name, font_size, font_bold, font_italic, opt)
     if not text or text == "" then return end
+
+    local font_style = font_italic and "Italic" or ""
+    local font_weight = font_bold and "Bold" or ""
+    local font_desc_str = string.format("%s %s %s %f", font_name, font_style, font_weight, font_size)
+
+    local text_color = {1,1,1} -- default white
+    if key == "subject" then
+        if SUBJECT_COLOR_TYPE == 'custom' then text_color = SUBJECT_COLOR_CUSTOM
+        elseif SUBJECT_COLOR_TYPE == 'black' then text_color = {0,0,0} end
+    elseif key == "preview" then
+        if PREVIEW_COLOR_TYPE == 'custom' then text_color = PREVIEW_COLOR_CUSTOM
+        elseif PREVIEW_COLOR_TYPE == 'black' then text_color = {0,0,0} end
+    end
+
     local state_table = scroll_states[key] or {}
     scroll_states[key] = state_table
-    local get_id = function()
-        return key .. "|" .. get_mail_id(mail) .. "|" .. (text or "")
-    end
-    local mail_id = get_id()
+    local mail_id = key .. "|" .. get_mail_id(mail) .. "|" .. (text or "")
     local now = now_time()
+
     local state = state_table[mail_id]
     if not state or state.last_mail_id ~= mail_id then
         state_table[mail_id] = {start_time=now, phase="start", rep=0, last_mail_id=mail_id}
         state = state_table[mail_id]
     end
 
-    set_font(cr, font_name, font_size, font_bold, font_italic)
-    local text_width = cached_text_width_emoji(cr, text, font_name, font_size, font_bold, font_italic)
+    local text_width = pango_text_width(cr, text, font_desc_str)
 
-if text_width <= maxw or not opt.scroll_enable then
-    local trimmed = cached_trim_emoji(cr, text, maxw, font_name, font_size, font_bold, font_italic)
-    draw_emoji_text(cr, trimmed, font_name, font_bold, font_size, x, y, font_italic)
-    return
-end
+    if text_width <= maxw or not (opt.scroll_enable and is_new_mail(mail)) then
+        pango_draw_text_ellipsized(cr, text, x, y, maxw, font_desc_str, text_color)
+        return
+    end
 
     local scroll_extra = opt.scroll_extra or (36 * GLOBAL_SCALE_FACTOR)
     local scroll_len = text_width - maxw + scroll_extra
@@ -1081,52 +916,31 @@ end
     local elapsed = now - state.start_time
     local phase = state.phase
     local ease_func = opt.scroll_ease or "linear"
+    local offset = 0
 
     if phase == "start" then
-        if elapsed < delay_start then
-            local trimmed = cached_trim_emoji(cr, text, maxw, font_name, font_size, font_bold, font_italic)
-            draw_emoji_text(cr, trimmed, font_name, font_bold, font_size, x, y, font_italic)
-        else
-            state.phase = "scroll"
-            state.start_time = now
-        end
-
+        if elapsed >= delay_start then state.phase = "scroll"; state.start_time = now end
     elseif phase == "scroll" then
         local t = math.min(1, elapsed / scroll_time)
-        local ease_t = (ease_func == "easeOut") and ease_out(t) or t
-        local offset = ease_t * scroll_len
+        offset = ((ease_func == "easeOut") and ease_out(t) or t) * scroll_len
+        if t >= 1 then state.phase = "pause_end"; state.start_time = now end
+    elseif phase == "pause_end" then
+        offset = scroll_len
+        if elapsed >= pause_end then
+            state.rep = state.rep + 1
+            if state.rep < scroll_repeat then state.phase = "start"; state.start_time = now
+            else state.phase = "done" end
+        end
+    end
 
+    if phase == "done" or (phase == "start" and elapsed < delay_start) then
+        pango_draw_text_ellipsized(cr, text, x, y, maxw, font_desc_str, text_color)
+    else
         cairo_save(cr)
         cairo_rectangle(cr, x, y - font_size, maxw, font_size + (12 * GLOBAL_SCALE_FACTOR))
         cairo_clip(cr)
-        draw_emoji_text(cr, text, font_name, font_bold, font_size, x - offset, y, font_italic)
+        pango_draw_text(cr, text, x - offset, y, font_desc_str, text_color)
         cairo_restore(cr)
-
-        if t >= 1 then
-            state.phase = "pause_end"
-            state.start_time = now
-        end
-
-    elseif phase == "pause_end" then
-        if elapsed < pause_end then
-            cairo_save(cr)
-            cairo_rectangle(cr, x, y - font_size, maxw, font_size + (12 * GLOBAL_SCALE_FACTOR))
-            cairo_clip(cr)
-            draw_emoji_text(cr, text, font_name, font_bold, font_size, x - scroll_len, y, font_italic)
-            cairo_restore(cr)
-        else
-            state.rep = state.rep + 1
-            if state.rep < scroll_repeat then
-                state.phase = "start"
-                state.start_time = now
-            else
-                state.phase = "done"
-            end
-        end
-
-    elseif phase == "done" then
-    local trimmed = cached_trim_emoji(cr, text, maxw, font_name, font_size, font_bold, font_italic)
-    draw_emoji_text(cr, trimmed, font_name, font_bold, font_size, x, y, font_italic)
     end
 end
 
@@ -1168,7 +982,7 @@ end
 -- KONIEC DODATKU Z MLEKIEM
 -- ======================================
 
--- ========== NOWA META-LINIA “RICH TEXT” ==========
+-- ========== NOWA META-LINIA “RICH TEXT” Z OBSŁUGĄ PANGO ==========
 
 local function build_meta_line_segments(mail)
     if not mail or not mail.meta then return {} end
@@ -1218,70 +1032,33 @@ local function build_meta_line_segments(mail)
     return segments
 end
 
-local function measure_meta_line_width(cr, segments, font_name, font_bold, font_size, font_italic)
-    local width = 0
+-- Rysuje segmenty meta-linii z offsetem (dla przewijania) lub przycięte
+local function pango_draw_meta_segments(cr, segments, x, y, max_width, font_desc_str, offset)
+    offset = offset or 0
+    local cursor = x - offset
+    
     for _, seg in ipairs(segments) do
-        set_font(cr, font_name, font_size, font_bold, font_italic)
-        local ext = cairo_text_extents_t:create()
-        cairo_text_extents(cr, seg.txt, ext)
-        width = width + ext.x_advance
-    end
-    return width
-end
+        local segment_width = pango_text_width(cr, seg.txt, font_desc_str)
 
-local function draw_meta_segments_trimmed(cr, segments, font_name, font_bold, font_size, font_italic, x, y, max_width)
-    local cursor = x
-    for idx, seg in ipairs(segments) do
-        set_color(cr, "custom", seg.color)
-        set_font(cr, font_name, font_size, font_bold, font_italic)
-        local ext = cairo_text_extents_t:create()
-        cairo_text_extents(cr, seg.txt, ext)
-        if cursor + ext.width <= x + max_width then
-            draw_emoji_text(cr, seg.txt, font_name, font_bold, font_size, cursor, y, font_italic)
-            cursor = cursor + ext.x_advance
-        else
-            -- Trzeba przyciąć segment z wielokropkiem
-            local sub = seg.txt
-            local found = false
-            for i = 1, utf8_len(seg.txt) do
-                local chunk = utf8_sub(seg.txt, 1, i) .. "..."
-                cairo_text_extents(cr, chunk, ext)
-                if cursor + ext.width > x + max_width then
-                    sub = utf8_sub(seg.txt, 1, i-1)
-                    found = true
-                    break
-                end
+        -- Jeśli rysujemy statycznie (bez offsetu), sprawdź czy trzeba przyciąć ostatni widoczny segment
+        if offset == 0 and cursor + segment_width > x + max_width then
+            local remaining_width = (x + max_width) - cursor
+            if remaining_width > 0 then
+                pango_draw_text_ellipsized(cr, seg.txt, cursor, y, remaining_width, font_desc_str, seg.color)
             end
-            draw_emoji_text(cr, sub .. "...", font_name, font_bold, font_size, cursor, y, font_italic)
-            cursor = cursor + ext.x_advance
+            break -- Zatrzymaj rysowanie, bo reszta się nie zmieści
+        end
+        
+        pango_draw_text(cr, seg.txt, cursor, y, font_desc_str, seg.color)
+        cursor = cursor + segment_width
+        
+        -- Jeśli rysujemy z offsetem, przerwij gdy wyjdziemy poza prawą krawędź widocznego obszaru
+        if offset > 0 and cursor > x + max_width + offset then
             break
         end
     end
-    return cursor
 end
 
-local function draw_meta_segments_scrolling(cr, segments, font_name, font_bold, font_size, font_italic, x, y, max_width, scroll_offset)
-    local cursor = x - (scroll_offset or 0)
-    for idx, seg in ipairs(segments) do
-        set_color(cr, "custom", seg.color)
-        set_font(cr, font_name, font_size, font_bold, font_italic)
-        draw_emoji_text(cr, seg.txt, font_name, font_bold, font_size, cursor, y, font_italic)
-        local ext = cairo_text_extents_t:create()
-        cairo_text_extents(cr, seg.txt, ext)
-        cursor = cursor + ext.x_advance
-        if cursor > x + max_width then break end
-    end
-end
-
--- [PATCH] podpis segmentów do cache szerokości meta
-local function segments_signature(segments)
-    local t = {}
-    for _, seg in ipairs(segments) do
-        t[#t+1] = seg.txt or ""
-    end
-    return table.concat(t, "\31")
-end
--- [/PATCH]
 
 local function draw_meta_line_rich(cr, mail, x, y)
     local meta_id = "meta|" .. (mail.uid or get_mail_id(mail))
@@ -1292,30 +1069,21 @@ local function draw_meta_line_rich(cr, mail, x, y)
         state = meta_scroll_states[meta_id]
     end
 
-    local font_name = META_LINE_FONT_NAME
-    local font_bold = META_LINE_FONT_BOLD
-    local font_size = META_LINE_FONT_SIZE
-    local font_italic = META_LINE_FONT_ITALIC
-
+    local font_desc_str = string.format("%s %s %s %f", META_LINE_FONT_NAME, (META_LINE_FONT_ITALIC and "Italic" or ""), (META_LINE_FONT_BOLD and "Bold" or ""), META_LINE_FONT_SIZE)
     local segments = build_meta_line_segments(mail)
     if #segments == 0 then return end
-
-    -- [PATCH] cache szerokości meta-linii
-    local sig = segments_signature(segments)
-    local key = table.concat({sig, font_name, font_size, font_bold and "b" or "n", font_italic and "i" or "n"}, "|")
-    local total_width = meta_width_cache[key]
-    if not total_width then
-        total_width = measure_meta_line_width(cr, segments, font_name, font_bold, font_size, font_italic)
-        meta_width_cache[key] = total_width
+    
+    local total_width = 0
+    for _, seg in ipairs(segments) do
+        total_width = total_width + pango_text_width(cr, seg.txt, font_desc_str)
     end
-    -- [/PATCH]
 
     if total_width <= META_LINE_MAX_WIDTH or not (META_LINE_SCROLL_ENABLE and is_new_mail(mail)) then
-    draw_meta_segments_trimmed(cr, segments, font_name, font_bold, font_size, font_italic, x, y, META_LINE_MAX_WIDTH)
-    return
-end
+        pango_draw_meta_segments(cr, segments, x, y, META_LINE_MAX_WIDTH, font_desc_str, 0)
+        return
+    end
 
-    -- przewijanie
+    -- Logika przewijania
     local scroll_extra = META_LINE_SCROLL_EXTRA or (36 * GLOBAL_SCALE_FACTOR)
     local scroll_len = total_width - META_LINE_MAX_WIDTH + scroll_extra
     if scroll_len < 1 then scroll_len = 1 end
@@ -1327,50 +1095,31 @@ end
     local elapsed = now - state.start_time
     local phase = state.phase
     local ease_func = META_LINE_SCROLL_EASE or "linear"
+    local offset = 0
 
     if phase == "start" then
-        if elapsed < delay_start then
-            draw_meta_segments_trimmed(cr, segments, font_name, font_bold, font_size, font_italic, x, y, META_LINE_MAX_WIDTH)
-        else
-            state.phase = "scroll"
-            state.start_time = now
-        end
-
+        if elapsed >= delay_start then state.phase = "scroll"; state.start_time = now end
     elseif phase == "scroll" then
         local t = math.min(1, elapsed / scroll_time)
-        local ease_t = (ease_func == "easeOut") and ease_out(t) or t
-        local offset = ease_t * scroll_len
-
-        cairo_save(cr)
-        cairo_rectangle(cr, x, y - font_size, META_LINE_MAX_WIDTH, font_size + (12 * GLOBAL_SCALE_FACTOR))
-        cairo_clip(cr)
-        draw_meta_segments_scrolling(cr, segments, font_name, font_bold, font_size, font_italic, x, y, META_LINE_MAX_WIDTH, offset)
-        cairo_restore(cr)
-
-        if t >= 1 then
-            state.phase = "pause_end"
-            state.start_time = now
-        end
-
+        offset = ((ease_func == "easeOut") and ease_out(t) or t) * scroll_len
+        if t >= 1 then state.phase = "pause_end"; state.start_time = now end
     elseif phase == "pause_end" then
-        if elapsed < pause_end then
-            cairo_save(cr)
-            cairo_rectangle(cr, x, y - font_size, META_LINE_MAX_WIDTH, font_size + (12 * GLOBAL_SCALE_FACTOR))
-            cairo_clip(cr)
-            draw_meta_segments_scrolling(cr, segments, font_name, font_bold, font_size, font_italic, x, y, META_LINE_MAX_WIDTH, scroll_len)
-            cairo_restore(cr)
-        else
+        offset = scroll_len
+        if elapsed >= pause_end then
             state.rep = state.rep + 1
-            if state.rep < scroll_repeat then
-                state.phase = "start"
-                state.start_time = now
-            else
-                state.phase = "done"
-            end
+            if state.rep < scroll_repeat then state.phase = "start"; state.start_time = now
+            else state.phase = "done" end
         end
+    end
 
-    elseif phase == "done" then
-        draw_meta_segments_trimmed(cr, segments, font_name, font_bold, font_size, font_italic, x, y, META_LINE_MAX_WIDTH)
+    if phase == "done" or (phase == "start" and elapsed < delay_start) then
+        pango_draw_meta_segments(cr, segments, x, y, META_LINE_MAX_WIDTH, font_desc_str, 0)
+    else
+        cairo_save(cr)
+        cairo_rectangle(cr, x, y - META_LINE_FONT_SIZE, META_LINE_MAX_WIDTH, META_LINE_FONT_SIZE + (12 * GLOBAL_SCALE_FACTOR))
+        cairo_clip(cr)
+        pango_draw_meta_segments(cr, segments, x, y, META_LINE_MAX_WIDTH, font_desc_str, offset)
+        cairo_restore(cr)
     end
 end
 
@@ -1378,9 +1127,13 @@ end
 
 local function draw_custom_user_text(cr)
     if not CUSTOM_TEXT_ENABLE or not CUSTOM_TEXT_VALUE or CUSTOM_TEXT_VALUE == "" then return end
-    set_color(cr, CUSTOM_TEXT_COLOR_TYPE, CUSTOM_TEXT_COLOR_CUSTOM)
-    set_font(cr, CUSTOM_TEXT_FONT, CUSTOM_TEXT_SIZE, CUSTOM_TEXT_BOLD, CUSTOM_TEXT_ITALIC)
-    draw_emoji_text(cr, CUSTOM_TEXT_VALUE, CUSTOM_TEXT_FONT, CUSTOM_TEXT_BOLD, CUSTOM_TEXT_SIZE, CUSTOM_TEXT_POS.x, CUSTOM_TEXT_POS.y, CUSTOM_TEXT_ITALIC)
+    
+    local color = {1,1,1} -- default white
+    if CUSTOM_TEXT_COLOR_TYPE == 'custom' then color = CUSTOM_TEXT_COLOR_CUSTOM
+    elseif CUSTOM_TEXT_COLOR_TYPE == 'black' then color = {0,0,0} end
+
+    local font_desc_str = string.format("%s %s %s %f", CUSTOM_TEXT_FONT, (CUSTOM_TEXT_ITALIC and "Italic" or ""), (CUSTOM_TEXT_BOLD and "Bold" or ""), CUSTOM_TEXT_SIZE)
+    pango_draw_text(cr, CUSTOM_TEXT_VALUE, CUSTOM_TEXT_POS.x, CUSTOM_TEXT_POS.y, font_desc_str, color)
 end
 
 local function draw_separator(cr)
@@ -1438,7 +1191,6 @@ local function apply_mail_scroll(filtered_mails, MAX_MAILS, MAILS_DIRECTION)
     local max_visible = math.max(0, MAX_MAILS or 0)
     local max_offset  = math.max(N - max_visible, 0)
 
-    -- offset + timeout → 0
     local offset = read_mail_scroll_offset()
     local last_mtime = get_mail_scroll_mtime()
     local now = os.time()
@@ -1447,14 +1199,12 @@ local function apply_mail_scroll(filtered_mails, MAX_MAILS, MAILS_DIRECTION)
         write_mail_scroll_offset(0)
     end
 
-    -- clamp
     if offset < 0 then offset = 0 end
     if offset > max_offset then
         offset = max_offset
         write_mail_scroll_offset(offset)
     end
 
-    -- slice
     local first = math.max(1, 1 + offset)
     local last  = math.min(N, first + max_visible - 1)
     local out = {}
@@ -1466,7 +1216,6 @@ end
 local function _conky_draw_mail_indicator_impl()
     if conky_window == nil then return end
     set_layout_by_mode()
-
 
 -- POBIERANIE DANYCH
 local data = fetch_mails_from_cache()
@@ -1505,9 +1254,6 @@ end
             meta=mail.meta,
             uid=mail.uid,
             account_name = mail.account_name,
-            -- =================================================================
-            -- KRYTYCZNA ZMIANA: Przekazanie danych o kolorze do tabeli roboczej
-            -- =================================================================
             color = mail.color
         })
     end
@@ -1518,9 +1264,7 @@ end
         local valid_ids = {}
         for i, mail in ipairs(last_good_mails) do
             valid_ids["subject|" .. get_mail_id(mail) .. "|" .. (mail.subject or "")] = true
-        local pid = mail.uid or get_mail_id(mail)
-        valid_ids["preview|" .. get_mail_id(mail) .. "|" .. join_preview_lines(mail.preview, MAIL_PREVIEW_LINES)] = true
-
+            valid_ids["preview|" .. get_mail_id(mail) .. "|" .. join_preview_lines(mail.preview, MAIL_PREVIEW_LINES)] = true
         end
         for key, tbl in pairs(scroll_states) do
             for k in pairs(tbl) do
@@ -1590,10 +1334,13 @@ local visible, mail_scroll_offset, max_offset =
         set_color(cr, BADGE_COLOR_TYPE, BADGE_COLOR_CUSTOM)
         cairo_fill_preserve(cr)
         set_color(cr, BADGE_BORDER_COLOR_TYPE, BADGE_BORDER_COLOR_CUSTOM)
-        cairo_set_line_width(cr, 3.3 * GLOBAL_SCALE_FACTOR) -- Skalowana szerokość obwódki badge
+        cairo_set_line_width(cr, 3.3 * GLOBAL_SCALE_FACTOR)
         cairo_stroke(cr)
         set_color(cr, BADGE_TEXT_COLOR_TYPE, BADGE_TEXT_COLOR_CUSTOM)
-        set_font(cr, FROM_FONT_NAME, FROM_FONT_SIZE + (4.5 * GLOBAL_SCALE_FACTOR), true, FROM_FONT_ITALIC) -- Skalowany rozmiar czcionki badge
+        
+        -- Używamy Cairo do tekstu w badge, bo Pango jest tu nadmiarowe
+        cairo_select_font_face(cr, FROM_FONT_NAME, CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD)
+        cairo_set_font_size(cr, FROM_FONT_SIZE + (4.5 * GLOBAL_SCALE_FACTOR))
         local txt = tostring(badge_count)
         local ext = cairo_text_extents_t:create()
         cairo_text_extents(cr, txt, ext)
@@ -1605,9 +1352,7 @@ local visible, mail_scroll_offset, max_offset =
     local num_mails = #visible
     local text_x = MAILS_POS.x
 
-    -- Wylicz pozycje wszystkich maili na ekranie (dla wybranego wycinka)
     local mail_positions = {}
-
     if MAILS_DIRECTION == "down" then
         local y = MAILS_POS.y
         for i = 1, num_mails do
@@ -1622,44 +1367,22 @@ local visible, mail_scroll_offset, max_offset =
         end
     end
 
-    -- Rysowanie każdej pozycji (tylko z 'visible')
     for i = 1, num_mails do
         local mail = visible[i] or {}
         local y_offset = mail_positions[i]
 
-        -- Mleczna poświata (opcjonalnie)
         if PER_MAIL_MILK_FILL_ENABLE or PER_MAIL_MILK_BORDER_ENABLE then
             local milk_x = text_x + (PER_MAIL_MILK_MARGIN_X or 0)
             local milk_y = y_offset + (PER_MAIL_MILK_MARGIN_Y or 0)
             local milk_w = PER_MAIL_MILK_WIDTH or (1065 * GLOBAL_SCALE_FACTOR)
             local milk_h = PER_MAIL_MILK_HEIGHT or (82.5 * GLOBAL_SCALE_FACTOR)
-
-            -- Zabezpieczenie promienia
             local max_radius = math.min(milk_w, milk_h) / 2
             local milk_radius = PER_MAIL_MILK_RADIUS
             if milk_radius < 0 then milk_radius = 0 end
             if milk_radius > max_radius then milk_radius = max_radius end
-            if PER_MAIL_MILK_RADIUS < 0 or PER_MAIL_MILK_RADIUS > max_radius then
-                print(string.format("[UWAGA] PER_MAIL_MILK_RADIUS=%s spoza zakresu! Poprawiono do %s", tostring(PER_MAIL_MILK_RADIUS), tostring(milk_radius)))
-            end
-
-            draw_per_mail_milk(
-                cr,
-                milk_x, milk_y,
-                milk_w, milk_h,
-                milk_radius,
-                PER_MAIL_MILK_FILL_ENABLE,
-                PER_MAIL_MILK_FILL_COLOR,
-                PER_MAIL_MILK_FILL_ALPHA,
-                PER_MAIL_MILK_BORDER_ENABLE,
-                PER_MAIL_MILK_BORDER_COLOR,
-                PER_MAIL_MILK_BORDER_ALPHA,
-                PER_MAIL_MILK_BORDER_WIDTH
-            )
+            draw_per_mail_milk(cr, milk_x, milk_y, milk_w, milk_h, milk_radius, PER_MAIL_MILK_FILL_ENABLE, PER_MAIL_MILK_FILL_COLOR, PER_MAIL_MILK_FILL_ALPHA, PER_MAIL_MILK_BORDER_ENABLE, PER_MAIL_MILK_BORDER_COLOR, PER_MAIL_MILK_BORDER_ALPHA, PER_MAIL_MILK_BORDER_WIDTH)
         end
 
-        -- Nadawca
-        set_font(cr, FROM_FONT_NAME, FROM_FONT_SIZE, FROM_FONT_BOLD, FROM_FONT_ITALIC)
         local from_prefix = ""
         if mail.account_name and mail.account_name ~= "" then
             from_prefix = "[" .. mail.account_name .. "] "
@@ -1667,7 +1390,6 @@ local visible, mail_scroll_offset, max_offset =
         local from_txt = from_prefix .. (mail.from or ""):gsub(":*$", "") .. ":"
         local from_end = draw_from_scrolling(cr, mail, from_txt, text_x, y_offset)
 
-        -- Ikony załącznika
         if mail.has_attachment then
             if ATTACHMENT_ICON_ENABLE then
                 local icon_x = text_x + ATTACHMENT_ICON_OFFSET.dx
@@ -1683,16 +1405,13 @@ local visible, mail_scroll_offset, max_offset =
             end
         end
 
-        -- Temat
-        set_color(cr, SUBJECT_COLOR_TYPE, SUBJECT_COLOR_CUSTOM)
-        set_font(cr, SUBJECT_FONT_NAME, SUBJECT_FONT_SIZE, SUBJECT_FONT_BOLD, SUBJECT_FONT_ITALIC)
         local subject_txt = mail.subject or ""
         local subject_x = from_end + FROM_TO_SUBJECT_GAP
         draw_scrolling_text(
             cr, "subject", mail, subject_txt, subject_x, y_offset, SUBJECT_MAX_WIDTH - (subject_x - text_x) - (18 * GLOBAL_SCALE_FACTOR),
             SUBJECT_FONT_NAME, SUBJECT_FONT_SIZE, SUBJECT_FONT_BOLD, SUBJECT_FONT_ITALIC,
             {
-                scroll_enable = SUBJECT_SCROLL_ENABLE and is_new_mail(mail),
+                scroll_enable = SUBJECT_SCROLL_ENABLE,
                 scroll_speed  = SUBJECT_SCROLL_SPEED,
                 scroll_repeat = SUBJECT_SCROLL_REPEAT,
                 scroll_delay  = SUBJECT_SCROLL_DELAY,
@@ -1701,29 +1420,25 @@ local visible, mail_scroll_offset, max_offset =
             }
         )
 
--- Podgląd treści (preview)
-local preview_y = y_offset + FROM_FONT_SIZE + MAIL_PREVIEW_SPACING
-if SHOW_MAIL_PREVIEW and mail.preview then
-    set_color(cr, PREVIEW_COLOR_TYPE, PREVIEW_COLOR_CUSTOM)
-    set_font(cr, PREVIEW_FONT_NAME, PREVIEW_FONT_SIZE, PREVIEW_FONT_BOLD, PREVIEW_FONT_ITALIC)
-    local preview_line = join_preview_lines(mail.preview, MAIL_PREVIEW_LINES)
-    local preview_cursor = PREVIEW_INDENT and (text_x + (27 * GLOBAL_SCALE_FACTOR)) or text_x
-    draw_scrolling_text(
-        cr, "preview", mail, preview_line, preview_cursor, preview_y,
-        PREVIEW_MAX_WIDTH - (18 * GLOBAL_SCALE_FACTOR),
-        PREVIEW_FONT_NAME, PREVIEW_FONT_SIZE, PREVIEW_FONT_BOLD, PREVIEW_FONT_ITALIC,
-        {
-            scroll_enable = PREVIEW_SCROLL_ENABLE and is_new_mail(mail),
-            scroll_speed  = PREVIEW_SCROLL_SPEED,
-            scroll_repeat = PREVIEW_SCROLL_REPEAT,
-            scroll_delay  = PREVIEW_SCROLL_DELAY,
-            scroll_ease   = PREVIEW_SCROLL_EASE,
-            scroll_extra  = PREVIEW_SCROLL_EXTRA,
-        }
-    )
-end
+        local preview_y = y_offset + FROM_FONT_SIZE + MAIL_PREVIEW_SPACING
+        if SHOW_MAIL_PREVIEW and mail.preview then
+            local preview_line = join_preview_lines(mail.preview, MAIL_PREVIEW_LINES)
+            local preview_cursor = PREVIEW_INDENT and (text_x + (27 * GLOBAL_SCALE_FACTOR)) or text_x
+            draw_scrolling_text(
+                cr, "preview", mail, preview_line, preview_cursor, preview_y,
+                PREVIEW_MAX_WIDTH - (18 * GLOBAL_SCALE_FACTOR) - (preview_cursor - text_x),
+                PREVIEW_FONT_NAME, PREVIEW_FONT_SIZE, PREVIEW_FONT_BOLD, PREVIEW_FONT_ITALIC,
+                {
+                    scroll_enable = PREVIEW_SCROLL_ENABLE,
+                    scroll_speed  = PREVIEW_SCROLL_SPEED,
+                    scroll_repeat = PREVIEW_SCROLL_REPEAT,
+                    scroll_delay  = PREVIEW_SCROLL_DELAY,
+                    scroll_ease   = PREVIEW_SCROLL_EASE,
+                    scroll_extra  = PREVIEW_SCROLL_EXTRA,
+                }
+            )
+        end
 
-        -- Meta-linia (3. linia pod mailem)
         if META_LINE_ENABLE then
             local meta_y
             if SHOW_MAIL_PREVIEW and mail.preview then
@@ -1738,6 +1453,7 @@ end
     cairo_destroy(cr)
     cairo_surface_destroy(cs)
 end
+
 function conky_draw_mail_indicator()
     local ok, err = xpcall(_conky_draw_mail_indicator_impl, function(e)
         return debug.traceback(e, 2)

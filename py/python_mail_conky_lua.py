@@ -60,7 +60,7 @@ NETWORK_CHECK_TIMEOUT = 2 # s - dla is_internet_available
 NETWORK_MONITOR_INTERVAL = 5 # s - jak często wątek monitorujący sieć sprawdza status
 
 # --- KLUCZ PŁATNEGO GEOIP (PRIORYTET #2 – nadpisywalny przez CLI) ---
-IPGEOLOCATION_API_KEY = "" # <-- opcjonalny klucz API (może być pusty)
+IPGEOLOCATION_API_KEY = "5355c6a1c06444e098594e6d5ca1ca91" # <-- opcjonalny klucz API (może być pusty)
 
 # --- DEBUG GEOIP (głosowanie providerów) ---
 GEOIP_DEBUG_DEFAULT = True

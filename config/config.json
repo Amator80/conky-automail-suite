@@ -8,7 +8,7 @@
       "port": null,
       "login": null,
       "password": null,
-      "encryption": "STARTTLS",
+      "encryption": "SSL",
       "color": [
         255,
         229,
@@ -68,7 +68,7 @@
       "port": null,
       "login": null,
       "password": null,
-      "encryption": "SSL",
+      "encryption": "STARTTLS",
       "color": [
         255,
         51,
