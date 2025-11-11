@@ -4,6 +4,8 @@
 ![Wersja: 1.0.0](https://img.shields.io/badge/Wersja-1.0.0-brightgreen)
 ![Utrzymywany?: Tak](https://img.shields.io/badge/Utrzymywany%3F-Tak-green.svg)
 
+![alt text](screenshot.png)
+
 **Conky AutoMail Suite** to nie tylko widżet, ale kompletny, modułowy system do monitorowania poczty e-mail w środowisku Conky na Linuksie. Dzięki zaawansowanej architekturze z demonem w Pythonie, graficznym narzędziom konfiguracyjnym i potężnym możliwościom personalizacji w Lua, projekt zapewnia niezrównaną wydajność, stabilność i wygodę użytkowania.
 
 Pakiet oferuje pełne wsparcie dla wielu kont e-mail, dynamiczne przełączanie widoków, aliasy, a także zestaw graficznych narzędzi do łatwego zarządzania kontami i pocztą bezpośrednio z pulpitu.
