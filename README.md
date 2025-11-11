@@ -17,7 +17,7 @@ Pakiet oferuje pełne wsparcie dla wielu kont e-mail, dynamiczne przełączanie 
 6.  [Wymagania](#wymagania)
 7.  [Instalacja i Konfiguracja](#instalacja-i-konfiguracja)
 8.  [Użytkowanie i Zarządzanie](#użytkowanie-i-zarządzanie)
-9.  [Rozwiązywanie problemów](#rozwiazywanie-problemów)
+9.  [Rozwiązywanie problemów](#rozwiązywanie-problemów)
 10. [FAQ - Najczęściej Zadawane Pytania](#faq---najczęściej-zadawane-pytania)
 11. [Kompatybilność](#kompatybilność)
 12. [Autorzy i Licencja](#autorzy-i-licencja)
