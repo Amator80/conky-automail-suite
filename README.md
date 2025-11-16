@@ -195,7 +195,7 @@ Projekt powinien działać na większości nowoczesnych dystrybucji Linuksa, kt�
 ## Autorzy i Licencja
 **Autorzy projektu**
 *   **Amator_80**: `<mmajcher804@gmail.com>` (Discord: `Amator80`)
-*   **Zupix**: `<dark.przemi@gmail.com>` (Discord: `Zupix`)
+*   **Zupix**: `<the.rabbit.rhod@gmail.com>` (Discord: `Zupix`)
 
 Możesz spotkać autorów na serwerze Discord: **Świat Linuksa** - [https://discord.com/invite/69EMVfN](https://discord.com/invite/69EMVfN)
 
