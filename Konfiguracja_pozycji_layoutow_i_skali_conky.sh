@@ -89,31 +89,26 @@ ASCII_PREVIEWS="<tt>
 while true; do
 
     # Odczytaj aktualne wartości, aby ustawić je jako domyślne w YAD
-    CURRENT_LAYOUT=$(grep -oP 'LAYOUT_MODE = "\K[^"]+' "$LUA_FILE")
     CURRENT_SCALE_FACTOR=$(grep -oP 'GLOBAL_SCALE_FACTOR = \K[0-9.]+' "$LUA_FILE")
-    CURRENT_SCALE_PERCENT=$(printf "%.0f" $(bc <<< "$CURRENT_SCALE_FACTOR * 100"))
+    CURRENT_LAYOUT=$(grep -oP 'LAYOUT_MODE = "\K[^"]+' "$LUA_FILE")
+    # Zamiana float na procent. Np. "1.57" -> "157"
+    CURRENT_SCALE_PERCENT=${CURRENT_SCALE_FACTOR//.}
 
     # === Logika listy rozwijanej, aby zawsze było 6 opcji ===
-    # 1. Zdefiniuj statyczną listę wszystkich 6 opcji.
-    #    Używamy separatora, który nie występuje w tekstach (np. potok |)
     BASE_LAYOUT_LIST="down_left: dolny lewy róg, blok maili w górę|down: okno na dole, blok maili w górę|up: okno na górze, blok maili w dół|down_right: dolny prawy róg, blok maili w górę|up_right: górny prawy róg, blok maili w dół|up_left: górny lewy róg, blok maili w dół"
 
-    # 2. Użyj `sed`, aby dodać znacznik `^` na początku opcji, która jest aktualnie wybrana.
-    #    Najpierw zamieniamy nasz separator '|' na nową linię, aby `sed` mógł działać na każdej opcji osobno.
-    #    Potem z powrotem łączymy wszystko separatorem '!' wymaganym przez YAD.
     YAD_LAYOUT_OPTIONS=$(echo "$BASE_LAYOUT_LIST" | tr '|' '\n' | sed "s/^$CURRENT_LAYOUT:/\^&/" | tr '\n' '!')
-    # Usuń ostatni, nadmiarowy separator '!'
     YAD_LAYOUT_OPTIONS=${YAD_LAYOUT_OPTIONS%?}
 
     FORM_OUTPUT=$(yad --form --center \
         --title="Konfiguracja Widgetu Mail" \
         --width=800 \
         --text-align=left \
-        --text="<b>Podgląd dostępnych układów:</b>\n$ASCII_PREVIEWS\n<b>Wybierz układ i skalowanie widgetu:</b>" \
+        --text="<b>Podgląd dostępnych układów:</b>\n$ASCII_PREVIEWS\n<b>Wybierz układ i skalowanie widgetu (0–150%):</b>" \
         --field="Układ:CB" \
             "$YAD_LAYOUT_OPTIONS" \
-        --field="Skalowanie (%):SCL" \
-            "$CURRENT_SCALE_PERCENT[50,200,5]" \
+        --field="Skalowanie (0–150%):NUM" \
+            "$CURRENT_SCALE_PERCENT!0..150!1!0" \
         --button="Zastosuj:0" \
         --button="Zamknij:1"
     )
@@ -128,17 +123,24 @@ while true; do
     IFS='|' read -r SELECTED_LAYOUT_FULL SCALE_VALUE _ <<< "$FORM_OUTPUT"
     SELECTED_LAYOUT="${SELECTED_LAYOUT_FULL%%:*}"
     SCALE_INTEGER="${SCALE_VALUE%.*}"
+    # Wymuś traktowanie SCALE_INTEGER jako liczby dziesiętnej (np. 075 → 75)
+    SCALE_INTEGER=$((10#$SCALE_INTEGER))
 
     if [ -z "$SELECTED_LAYOUT" ] || [ -z "$SCALE_INTEGER" ]; then
         notify-send "Mail Widget - Błąd" "Nie wybrano wartości. Spróbuj ponownie."
         continue # Wróć na początek pętli
     fi
 
-    # === Obliczenia i modyfikacje plików ===
-    SCALE_FACTOR=$(bc -l <<< "$SCALE_INTEGER / 100")
-    NEW_WIDTH=$(printf "%.0f" $(bc -l <<< "$BASE_WIDTH * $SCALE_FACTOR"))
-    NEW_HEIGHT=$(printf "%.0f" $(bc -l <<< "$BASE_HEIGHT * $SCALE_FACTOR"))
-    FORMATTED_SCALE_FACTOR=$(LC_NUMERIC=C printf "%.2f" "$SCALE_FACTOR")
+    # === Obliczenia i modyfikacje plików (WERSJA BASH) ===
+    # Obliczanie nowego wymiaru z poprawnym zaokrągleniem matematycznym
+    NEW_WIDTH=$(((BASE_WIDTH * SCALE_INTEGER + 50) / 100))
+    NEW_HEIGHT=$(((BASE_HEIGHT * SCALE_INTEGER + 50) / 100))
+
+    # Formatowanie współczynnika skali do postaci "1.57"
+    INTEGER_PART=$((SCALE_INTEGER / 100))
+    FRACTIONAL_PART=$(printf "%02d" $((SCALE_INTEGER % 100)))
+    FORMATTED_SCALE_FACTOR="${INTEGER_PART}.${FRACTIONAL_PART}"
+
     ALIGN_VAL="${ALIGNMENTS[$SELECTED_LAYOUT]}"
 
     # === Blok zapisu ===
