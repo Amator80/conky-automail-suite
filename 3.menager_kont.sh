@@ -2,7 +2,7 @@
 # ===================================================================================
 # UNIWERSALNY KONFIGURATOR I SELEKTOR KONT E-MAIL (WERSJA FINALNA ROZSZERZONA)
 # - Obsługa wielokrotnego usuwania
-# - Możliwość zmiany kolejności kont
+# - Możliwość zmiany kolejności kont (NAPRAWIONA)
 # - W pełni spolszczony interfejs YAD
 # ===================================================================================
 # Skrypt służący do zarządzania kontami e-mail i wybierania, które z nich mają być
@@ -118,13 +118,16 @@ select_view() {
 # ===================================================================================
 edit_account() {
     local choice_string="$1"
-    if [[ $(echo "$choice_string" | wc -l) -gt 1 ]]; then
+    # Zabezpieczenie przed duplikatami linii
+    local CLEAN_CHOICE=$(echo "$choice_string" | grep "Konto #" | head -n 1)
+    
+    if [[ $(echo "$choice_string" | grep "Konto #" | wc -l) -gt 1 ]]; then
         yad --center --fixed --warning --text="Można edytować tylko jedno konto na raz." --width=500
         return
     fi
 
     local SLOT_NUM
-    SLOT_NUM=$(echo "$choice_string" | grep -o -E '[0-9]+')
+    SLOT_NUM=$(echo "$CLEAN_CHOICE" | grep -o -E 'Konto #[0-9]+' | grep -o -E '[0-9]+')
     [[ -z "$SLOT_NUM" ]] && return
     local INDEX=$((SLOT_NUM - 1))
 
@@ -268,7 +271,7 @@ delete_account() {
 
     while IFS= read -r line; do
         local SLOT_NUM
-        SLOT_NUM=$(echo "$line" | grep -o -E '[0-9]+')
+        SLOT_NUM=$(echo "$line" | grep -o -E 'Konto #[0-9]+' | grep -o -E '[0-9]+')
         [[ -z "$SLOT_NUM" ]] && continue
         local INDEX=$((SLOT_NUM - 1))
         
@@ -338,14 +341,18 @@ delete_account() {
 move_account() {
     local all_selections="$1"
     local direction="$2"
+    
+    # Czyszczenie selekcji z pustych linii i branie tylko pierwszej właściwej
+    local CLEAN_SELECTION=$(echo "$all_selections" | grep "Konto #" | head -n 1)
 
-    if [[ $(echo "$all_selections" | wc -l) -ne 1 ]]; then
+    if [[ -z "$CLEAN_SELECTION" ]]; then
         yad --center --fixed --warning --text="Aby zmienić kolejność, musisz zaznaczyć dokładnie jedno konto." --width=600
         return
     fi
 
     local SLOT_NUM
-    SLOT_NUM=$(echo "$all_selections" | grep -o -E '[0-9]+')
+    # Bezpieczniejszy grep: szuka 'Konto #X' a potem wyciąga z tego 'X'
+    SLOT_NUM=$(echo "$CLEAN_SELECTION" | grep -o -E 'Konto #[0-9]+' | grep -o -E '[0-9]+')
     [[ -z "$SLOT_NUM" ]] && return
     local INDEX=$((SLOT_NUM - 1))
     
@@ -354,7 +361,7 @@ move_account() {
     
     local TARGET_INDEX
     if [[ "$direction" == "up" ]]; then
-        if (( INDEX == 0 )); then
+        if (( INDEX <= 0 )); then
             yad --center --fixed --info --text="Nie można przesunąć pierwszego elementu wyżej." --width=500
             return
         fi
@@ -369,8 +376,9 @@ move_account() {
         return
     fi
     
+    # Bezpieczniejsza zamiana w JQ (użycie zmiennej tymczasowej)
     jq --argjson i "$INDEX" --argjson j "$TARGET_INDEX" \
-       '.accounts[$i] as $elem_i | .accounts[$j] as $elem_j | .accounts[$i] = $elem_j | .accounts[$j] = $elem_i' \
+       '.accounts |= (.[$i] as $tmp | .[$i] = .[$j] | .[$j] = $tmp)' \
        "$CONFIG_PATH" > "$CONFIG_PATH.tmp" && mv "$CONFIG_PATH.tmp" "$CONFIG_PATH"
 }
 
@@ -411,17 +419,19 @@ while true; do
     POS_X=$(((SCREEN_WIDTH - WIN_WIDTH) / 2))
     POS_Y=$(((SCREEN_HEIGHT - WIN_HEIGHT) / 2))
     
+    # USUNIĘTO: --select-action="echo %s" (To powodowało błędy z podwójnym zaznaczaniem)
+    # ZMIENIONO: Kody przycisków Góra/Dół na 50/60 (Aby uniknąć konfliktów systemowych)
     CHOICE_AND_SELECTION=$(yad --list \
         --title="Konfigurator kont e-mail" \
         --geometry="${WIN_WIDTH}x${WIN_HEIGHT}+$POS_X+$POS_Y" \
         --text="<b>Zarządzaj kontami e-mail.</b>\n- Kliknij dwukrotnie, aby <b>edytować</b> pojedyncze konto.\n- Zaznacz jedno konto i użyj przycisków, aby je <b>przesunąć</b>.\n- Aby <b>usunąć wiele kont naraz</b>, zaznacz je przytrzymując \Ctrl\ lub \Shift\.\n- Użyj przycisków na dole do wykonania pozostałych akcji." \
         --column="Stan:TEXT" --column="Slot" --column="Login / Nazwa:TEXT" \
-        --print-column=2 --select-action="echo %s" \
+        --print-column=2 \
         --multiple \
         --button="Dodaj konto:3" \
         --button="Usuń zaznaczone:4" \
-        --button="Przesuń w górę:5" \
-        --button="Przesuń w dół:6" \
+        --button="Przesuń w górę:50" \
+        --button="Przesuń w dół:60" \
         --button="Wybierz konta:2" \
         --button="Zamknij:1" \
         "${ACCOUNTS_INFO[@]}")
@@ -444,10 +454,10 @@ while true; do
         4)
             delete_account "$CHOICE_AND_SELECTION"
             ;;
-        5)
+        50) # Zmiana z 5 na 50
             move_account "$CHOICE_AND_SELECTION" "up"
             ;;
-        6)
+        60) # Zmiana z 6 na 60
             move_account "$CHOICE_AND_SELECTION" "down"
             ;;
         *)

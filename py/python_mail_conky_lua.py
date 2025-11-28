@@ -771,49 +771,68 @@ def extract_sender_name(from_header):
 
 def get_mail_preview(msg, line_mode, sort_preview=False, diag=None):
     t0 = time.perf_counter()
-    best_plain = None
     cleaned_time = 0.0
+    
+    # Zmienne na najlepszych kandydatów
+    best_html = None
+    best_plain = None
 
     if msg.is_multipart():
+        # Przechodzimy przez wszystkie części maila RAZ
         for part in msg.walk():
             ctype = part.get_content_type()
             disp = (part.get("Content-Disposition") or "").lower()
-            if ctype == "text/plain" and "attachment" not in disp:
-                payload = part.get_payload(decode=True) or b""
-                charset = part.get_content_charset() or "utf-8"
-                try:
-                    text = payload.decode(charset, errors="replace")
-                except Exception:
-                    text = payload.decode("utf-8", errors="replace")
+            
+            # Pomijamy załączniki, które nie są treścią inline
+            if "attachment" in disp and ctype not in ("text/html", "text/plain"):
+                continue
+
+            payload = part.get_payload(decode=True) or b""
+            charset = part.get_content_charset() or "utf-8"
+            try:
+                text = payload.decode(charset, errors="replace")
+            except Exception:
+                text = payload.decode("utf-8", errors="replace")
+            
+            # Jeśli część jest pusta, idź dalej
+            if not text.strip():
+                continue
+
+            # Zbieramy kandydatów (wybieramy najdłuższy fragment danego typu)
+            if ctype == "text/html":
+                if not best_html or len(text) > len(best_html):
+                    best_html = text
+            elif ctype == "text/plain":
                 if not best_plain or len(text) > len(best_plain):
                     best_plain = text
-        if best_plain:
+
+        # === ZMIANA PRIORYTETU TUTAJ ===
+        # Najpierw sprawdzamy HTML. Jeśli jest, używamy go (bo zawiera właściwą treść marketingu/Interii).
+        if best_html:
             t1 = time.perf_counter()
-            out = clean_preview(best_plain, line_mode, sort_preview)
+            out = clean_preview(best_html, line_mode, sort_preview)
             t2 = time.perf_counter()
             cleaned_time += (t2 - t1)
+            
             if diag is not None:
                 diag['preview_total_s_total'] = diag.get('preview_total_s_total', 0.0) + (t2 - t0)
                 diag['preview_clean_html_s_total'] = diag.get('preview_clean_html_s_total', 0.0) + cleaned_time
             return out
 
-        for part in msg.walk():
-            if part.get_content_type() == "text/html":
-                payload = part.get_payload(decode=True) or b""
-                charset = part.get_content_charset() or "utf-8"
-                try:
-                    text = payload.decode(charset, errors="replace")
-                except Exception:
-                    text = payload.decode("utf-8", errors="replace")
-                t1 = time.perf_counter()
-                out = clean_preview(text, line_mode, sort_preview)
-                t2 = time.perf_counter()
-                cleaned_time += (t2 - t1)
-                if diag is not None:
-                    diag['preview_total_s_total'] = diag.get('preview_total_s_total', 0.0) + (t2 - t0)
-                    diag['preview_clean_html_s_total'] = diag.get('preview_clean_html_s_total', 0.0) + cleaned_time
-                return out
+        # Jeśli nie ma HTML, używamy Plain Text
+        if best_plain:
+            t1 = time.perf_counter()
+            out = clean_preview(best_plain, line_mode, sort_preview)
+            t2 = time.perf_counter()
+            cleaned_time += (t2 - t1)
+
+            if diag is not None:
+                diag['preview_total_s_total'] = diag.get('preview_total_s_total', 0.0) + (t2 - t0)
+                diag['preview_clean_html_s_total'] = diag.get('preview_clean_html_s_total', 0.0) + cleaned_time
+            return out
+
     else:
+        # Obsługa maili nie-multipart (bez zmian)
         payload = msg.get_payload(decode=True) or b""
         charset = msg.get_content_charset() or "utf-8"
         try:

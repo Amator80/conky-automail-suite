@@ -11,21 +11,6 @@
       "encryption": "SSL",
       "color": [
         255,
-        51,
-        196,
-        255
-      ]
-    },
-    {
-      "enabled": false,
-      "name": null,
-      "host": null,
-      "port": null,
-      "login": null,
-      "password": null,
-      "encryption": "SSL",
-      "color": [
-        255,
         0,
         255,
         56
@@ -59,6 +44,21 @@
         229,
         165,
         10
+      ]
+    },
+    {
+      "enabled": false,
+      "name": null,
+      "host": null,
+      "port": null,
+      "login": null,
+      "password": null,
+      "encryption": "SSL",
+      "color": [
+        255,
+        255,
+        255,
+        255
       ]
     },
     {
