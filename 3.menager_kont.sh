@@ -4,6 +4,7 @@
 # - Obsługa wielokrotnego usuwania
 # - Możliwość zmiany kolejności kont (NAPRAWIONA)
 # - W pełni spolszczony interfejs YAD
+# - BEZPIECZNY ZAPIS HASEŁ (Obsługa znaków specjalnych i separatorów)
 # ===================================================================================
 # Skrypt służący do zarządzania kontami e-mail i wybierania, które z nich mają być
 # aktywne do celów wyświetlania (np. w Conky). Wykorzystuje YAD do interfejsu
@@ -163,9 +164,13 @@ edit_account() {
     local EDIT_POS_X=$(((SCREEN_WIDTH - EDIT_WIN_WIDTH) / 2))
     local EDIT_POS_Y=$(((SCREEN_HEIGHT - EDIT_WIN_HEIGHT) / 2))
 
+    # --- BEZPIECZNY SEPARATOR (ASCII Unit Separator) ---
+    local SEP=$'\x1f'
+
     local EDIT_DATA
     EDIT_DATA=$(yad --form --title="Edycja konta #$SLOT_NUM" \
         --width="$EDIT_WIN_WIDTH" --height="$EDIT_WIN_HEIGHT" --geometry="+$EDIT_POS_X+$EDIT_POS_Y" \
+        --separator="$SEP" \
         --field="Aktywne:CHK" \
         --field="Nazwa konta (opis):" \
         --field="Host IMAP:" \
@@ -181,7 +186,9 @@ edit_account() {
     local EDIT_EXIT_STATUS=$?
     if [ $EDIT_EXIT_STATUS -eq 0 ]; then
         local new_enabled new_name new_host new_port new_encryption new_login new_password new_color_hex new_alpha
-        IFS='|' read -r new_enabled new_name new_host new_port new_encryption new_login new_password new_color_hex new_alpha <<< "$EDIT_DATA"
+        
+        # Użycie bezpiecznego separatora do odczytu danych
+        IFS="$SEP" read -r new_enabled new_name new_host new_port new_encryption new_login new_password new_color_hex new_alpha <<< "$EDIT_DATA"
 
         local hex_clean=${new_color_hex#\#}
         local r=$((16#${hex_clean:0:2}))
@@ -217,9 +224,13 @@ add_account() {
     local ADD_POS_X=$(((SCREEN_WIDTH - ADD_WIN_WIDTH) / 2))
     local ADD_POS_Y=$(((SCREEN_HEIGHT - ADD_WIN_HEIGHT) / 2))
 
+    # --- BEZPIECZNY SEPARATOR (ASCII Unit Separator) ---
+    local SEP=$'\x1f'
+
     local ADD_DATA
     ADD_DATA=$(yad --form --title="Dodaj nowe konto" \
         --width="$ADD_WIN_WIDTH" --height="$ADD_WIN_HEIGHT" --geometry="+$ADD_POS_X+$ADD_POS_Y" \
+        --separator="$SEP" \
         --field="Aktywne:CHK" \
         --field="Nazwa konta (opis):" \
         --field="Host IMAP:" \
@@ -235,7 +246,9 @@ add_account() {
     local ADD_EXIT_STATUS=$?
     if [ $ADD_EXIT_STATUS -eq 0 ]; then
         local new_enabled new_name new_host new_port new_encryption new_login new_password new_color_hex new_alpha
-        IFS='|' read -r new_enabled new_name new_host new_port new_encryption new_login new_password new_color_hex new_alpha <<< "$ADD_DATA"
+        
+        # Użycie bezpiecznego separatora do odczytu danych
+        IFS="$SEP" read -r new_enabled new_name new_host new_port new_encryption new_login new_password new_color_hex new_alpha <<< "$ADD_DATA"
 
         local hex_clean=${new_color_hex#\#}
         local r=$((16#${hex_clean:0:2}))

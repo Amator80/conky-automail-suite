@@ -71,12 +71,12 @@ SHOW_MAIL_PREVIEW = true              -- [true/false] Jeśli true, pokaże fragm
 ------------------- DŹWIĘKI (nowa/znikająca wiadomość) -------------------
 NEW_MAIL_SOUND_ENABLE = true                                                     -- [true/false] Włącz dźwięk nowej wiadomości pocztowej
 MAIL_DISAPPEAR_SOUND_ENABLE = true                                               -- [true/false] Dźwięk przy znikaniu maila z listy
-NEW_MAIL_SOUND = "/home/linux/Pulpit/conky-automail-suite/sound/nowy_mail.wav"          -- Ścieżka do dźwięku nowej poczty (WAV)
-MAIL_DISAPPEAR_SOUND = "/home/linux/Pulpit/conky-automail-suite/sound/remove_mail.wav"  -- Ścieżka do dźwięku znikającego maila z listy (WAV)
+NEW_MAIL_SOUND = "/home/linux/.git_projekt_mail/conky-automail-suite/sound/nowy_mail.wav"          -- Ścieżka do dźwięku nowej poczty (WAV)
+MAIL_DISAPPEAR_SOUND = "/home/linux/.git_projekt_mail/conky-automail-suite/sound/remove_mail.wav"  -- Ścieżka do dźwięku znikającego maila z listy (WAV)
 
 ------------------- KOPERTA – IKONA GŁÓWNA -------------------
 SHOW_ENVELOPE_ICON = true                                                        -- [true/false] Pokazuj ikonę koperty
-ENVELOPE_IMAGE = "/home/linux/Pulpit/conky-automail-suite/icons/mail.png"               -- Ścieżka do obrazka koperty (PNG)
+ENVELOPE_IMAGE = "/home/linux/.git_projekt_mail/conky-automail-suite/icons/mail.png"               -- Ścieżka do obrazka koperty (PNG)
 
 ENVELOPE_SIZE = { w = 141 * GLOBAL_SCALE_FACTOR, h = 141 * GLOBAL_SCALE_FACTOR } -- Rozmiar (szerokość, wysokość) koperty w px
 
@@ -264,7 +264,7 @@ ATTACHMENT_ICON_ENABLE = true                         -- [true/false] Czy wyświ
 ATTACHMENT_ICON_SIZE = { w = 36 * GLOBAL_SCALE_FACTOR, h = 42 * GLOBAL_SCALE_FACTOR }      -- Rozmiar ikony (szerokość, wysokość)
 ATTACHMENT_ICON_ANGLE = 0                             -- Obrót ikony (w stopniach)
 ATTACHMENT_ICON_MIRROR = false                        -- [true/false] Lustrzane odbicie ikony
-ATTACHMENT_ICON_IMAGE = "/home/linux/Pulpit/conky-automail-suite/icons/spinacz1.png" -- Ścieżka do ikony (np. spinacz)
+ATTACHMENT_ICON_IMAGE = "/home/linux/.git_projekt_mail/conky-automail-suite/icons/spinacz1.png" -- Ścieżka do ikony (np. spinacz)
 -- UWAGA: Pozycja ikony/kropki (OFFSET) została przeniesiona do KONFIGURACJA PROFILI UKŁADU (DLA 1, 2 LUB 3 LINII)
 
 
