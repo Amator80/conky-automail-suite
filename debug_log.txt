@@ -1,0 +1,24 @@
+--- NOWA SESJA (FIX V2): czw, 20 lis 2025, 10:37:45 CET ---
+[10:37:45] Start skryptu naprawczego V2.
+[10:37:48] EXIT CODE: 50 | SELECTION: '4|'
+[10:37:48] --- MOVE START ---
+[10:37:48] Input: '4|' Dir: up
+[10:37:48] SUCCESS: Moved 4 to 3
+[10:37:51] EXIT CODE: 60 | SELECTION: '3|'
+[10:37:51] --- MOVE START ---
+[10:37:51] Input: '3|' Dir: down
+[10:37:51] SUCCESS: Moved 3 to 4
+[10:37:59] EXIT CODE: 50 | SELECTION: '4|'
+[10:37:59] --- MOVE START ---
+[10:37:59] Input: '4|' Dir: up
+[10:37:59] SUCCESS: Moved 4 to 3
+[10:38:03] EXIT CODE: 50 | SELECTION: '3|'
+[10:38:03] --- MOVE START ---
+[10:38:03] Input: '3|' Dir: up
+[10:38:03] SUCCESS: Moved 3 to 2
+[10:38:05] EXIT CODE: 70 | SELECTION: ''
+[10:38:06] DODAWANIE - Konto dodane.
+[10:38:11] EXIT CODE: 70 | SELECTION: ''
+[10:38:14] DODAWANIE - Konto dodane.
+[10:38:18] EXIT CODE: 252 | SELECTION: ''
+[10:38:18] Skrypt zakończony.

@@ -5,9 +5,55 @@ import json
 import argparse
 import sys
 import socket
+import os
+import subprocess
 
 # Ustawienie globalnego limitu czasu dla operacji sieciowych.
 SOCKET_TIMEOUT = 15
+
+# =================== KONFIGURACJA ŚCIEŻEK ===================
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Logika dla wersji Portable (Config w folderze projektu)
+# Sprawdzamy czy folder config jest obok skryptu, czy piętro wyżej
+if os.path.isdir(os.path.join(SCRIPT_DIR, 'config')):
+    BASE_DIR = SCRIPT_DIR
+else:
+    BASE_DIR = os.path.dirname(SCRIPT_DIR)
+
+# Klucz szukamy w bezpiecznym katalogu użytkownika (zgodnie z nowym standardem)
+SECRET_KEY_PATH = os.path.expanduser("~/.config/conky-mail-secret-key/.secret_key")
+
+# =================== FUNKCJA DESZYFRUJĄCA ===================
+
+def decrypt_password(encrypted_pass):
+    """
+    Odszyfrowuje hasło przy użyciu klucza z pliku .secret_key (AES-256-CBC).
+    """
+    if not encrypted_pass:
+        return ""
+    
+    # Jeśli brak pliku klucza, zwracamy oryginał (może to plain text ze starych wersji)
+    if not os.path.exists(SECRET_KEY_PATH):
+        return encrypted_pass
+
+    try:
+        # Wywołanie openssl identyczne jak w skryptach Bash
+        result = subprocess.run(
+            ['openssl', 'enc', '-d', '-aes-256-cbc', 
+             '-salt', '-pbkdf2', 
+             '-pass', f'file:{SECRET_KEY_PATH}', 
+             '-a', '-A'],
+            input=encrypted_pass.encode('utf-8'),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True
+        )
+        return result.stdout.decode('utf-8')
+    except Exception:
+        return encrypted_pass
+
+# =================== ORYGINALNA LOGIKA SKRYPTU ===================
 
 def mask_string(s, visible_chars=3):
     """
@@ -39,7 +85,14 @@ def perform_action(config_path, action, target_accounts, mode, count):
 
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
-            all_accounts = json.load(f).get("accounts", [])
+            data = json.load(f)
+            # Obsługa nowej struktury (master_hash + accounts) oraz starej (tylko accounts)
+            if "accounts" in data and isinstance(data["accounts"], list):
+                all_accounts = data["accounts"]
+            else:
+                # Fallback dla bardzo starych plików (choć menedżer je naprawia)
+                all_accounts = data.get("accounts", [])
+
     except (IOError, json.JSONDecodeError) as e:
         print(f"BŁĄD: Nie można wczytać lub przetworzyć pliku konfiguracyjnego '{config_path}': {e}", file=sys.stderr)
         sys.exit(1)
@@ -73,7 +126,12 @@ def perform_action(config_path, action, target_accounts, mode, count):
             else:
                 raise ValueError(f"Niewspierany typ szyfrowania: '{encryption}'")
 
-            imap.login(acc["login"], acc["password"])
+            # === [ZMIANA] Odszyfrowanie hasła przed logowaniem ===
+            raw_password = acc["password"]
+            real_password = decrypt_password(raw_password)
+            
+            imap.login(acc["login"], real_password)
+            # =====================================================
 
             mailbox = "INBOX"
             if action == "empty-trash":
@@ -85,7 +143,8 @@ def perform_action(config_path, action, target_accounts, mode, count):
             
             imap.select(f'"{mailbox}"')
 
-            criteria_map = {'mark-read': 'UNSEEN', 'mark-unread': 'SEEN', 'move-to-trash': 'ALL', 'empty-trash': 'ALL'}
+            # [POPRAWKA] Używamy ALL dla wszystkiego, żeby licznik "first/last" działał poprawnie na całej skrzynce
+            criteria_map = {'mark-read': 'ALL', 'mark-unread': 'ALL', 'move-to-trash': 'ALL', 'empty-trash': 'ALL'}
             search_criteria = criteria_map[action]
 
             typ, data = imap.uid('search', None, search_criteria)
@@ -96,7 +155,7 @@ def perform_action(config_path, action, target_accounts, mode, count):
             all_uids = data[0].split()
             total_found = len(all_uids) # Zapamiętujemy, ile łącznie wiadomości znaleziono.
 
-            # === POCZĄTEK MODYFIKACJI: ZABEZPIECZENIE I KOMUNIKAT O LICZBIE WIADOMOŚCI ===
+            # === ORYGINALNA LOGIKA FILTROWANIA (ZACHOWANA 1:1) ===
             target_uids = []
             
             if action == 'empty-trash':
@@ -123,7 +182,7 @@ def perform_action(config_path, action, target_accounts, mode, count):
             
             uids_str = b','.join(target_uids).decode('utf-8')
             final_count = len(target_uids)
-            # === KONIEC MODYFIKACJI ===
+            # === KONIEC ORYGINALNEJ LOGIKI ===
 
             if action == 'mark-read':
                 imap.uid('store', uids_str, '+FLAGS', r'(\Seen)')

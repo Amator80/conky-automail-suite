@@ -9,35 +9,19 @@ mkdir -p "$CACHE_DIR"
 exec 200>/dev/shm/conky-automail-suite/.myconkyluadir.lock
 if ! flock -n 200; then
     echo "Inna instancja skryptu już działa!"
-    # Jeśli inna instancja działa, spróbuj przenieść okno YAD na pierwszy plan
-    # (wymaga `wmctrl`, zainstaluj np. `sudo apt-get install wmctrl` jeśli go nie masz)
     if command -v wmctrl &> /dev/null; then
         wmctrl -a "Konfiguracja Widgetu Mail"
     fi
     exit 1
 fi
 
-# Pułapka, aby zwolnić blokadę przy zamykaniu skryptu (np. przez Ctrl+C)
 trap 'rm -f /dev/shm/conky-automail-suite/.myconkyluadir.lock' EXIT
 
 # === Ścieżki do plików ===
 LUA_FILE="lua/e-mail.lua"
 CONKY_FILE="conkyrc_mail"
 
-# === Konfiguracja bazowa (dla skali 1.00) ===
-BASE_WIDTH=1275
-BASE_HEIGHT=510
-
-declare -A ALIGNMENTS=(
-    ["down"]="bottom_middle"
-    ["up"]="top_middle"
-    ["down_left"]="bottom_left"
-    ["down_right"]="bottom_right"
-    ["up_left"]="top_left"
-    ["up_right"]="top_right"
-)
-
-# Przygotuj tekst z podglądami ASCII
+# ASCII ART
 ASCII_PREVIEWS="<tt>
  _______________________________________________
 |         [mail]                                |
@@ -83,87 +67,167 @@ ASCII_PREVIEWS="<tt>
  ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
 </tt>"
 
+# === FUNKCJE POMOCNICZE ===
+
+get_lua_bool() {
+    local var_name=$1
+    local val=$(grep -oP "${var_name}\s*=\s*\K(true|false)" "$LUA_FILE")
+    if [ "$val" == "true" ]; then echo "TRUE"; else echo "FALSE"; fi
+}
+
+save_lua_bool() {
+    local var_name=$1
+    local yad_val=$2
+    local lua_val="false"
+    if [ "$yad_val" == "TRUE" ]; then lua_val="true"; fi
+    sed -i "s|^${var_name}\s*=.*|${var_name} = ${lua_val}|" "$LUA_FILE"
+}
 
 # === GŁÓWNA PĘTLA APLIKACJI ===
-# Pętla będzie działać, dopóki użytkownik nie kliknie "Zamknij" lub nie zamknie okna
 while true; do
 
-    # Odczytaj aktualne wartości, aby ustawić je jako domyślne w YAD
+    # 1. Odczyt parametrów z LUA
     CURRENT_SCALE_FACTOR=$(grep -oP 'GLOBAL_SCALE_FACTOR = \K[0-9.]+' "$LUA_FILE")
     CURRENT_LAYOUT=$(grep -oP 'LAYOUT_MODE = "\K[^"]+' "$LUA_FILE")
-    # Zamiana float na procent. Np. "1.57" -> "157"
-    CURRENT_SCALE_PERCENT=${CURRENT_SCALE_FACTOR//.}
+    CURRENT_MAX_MAILS=$(grep -oP 'MAX_MAILS = \K[0-9]+' "$LUA_FILE")
+    CURRENT_WIDTH=$(grep -oP 'GLOBAL_WIDTH_MODIFIER = \K[0-9]+' "$LUA_FILE")
 
-    # === Logika listy rozwijanej, aby zawsze było 6 opcji ===
+    # Wartości domyślne (zabezpieczenie)
+    if [ -z "$CURRENT_MAX_MAILS" ]; then CURRENT_MAX_MAILS=5; fi
+    if [ -z "$CURRENT_WIDTH" ]; then CURRENT_WIDTH=1275; fi
+    if [ -z "$CURRENT_SCALE_FACTOR" ]; then CURRENT_SCALE_FACTOR=1.0; fi
+
+    # Oblicz procenty (LC_NUMERIC=C zapewnia poprawność kropki dziesiętnej)
+    CURRENT_SCALE_PERCENT=$(LC_NUMERIC=C awk -v val="$CURRENT_SCALE_FACTOR" 'BEGIN { printf "%.0f", val * 100 }')
+
+    # Odczyt checkboxów
+    CHK_PREVIEW=$(get_lua_bool "SHOW_MAIL_PREVIEW")
+    CHK_META=$(get_lua_bool "META_LINE_ENABLE")
+
     BASE_LAYOUT_LIST="down_left: dolny lewy róg, blok maili w górę|down: okno na dole, blok maili w górę|up: okno na górze, blok maili w dół|down_right: dolny prawy róg, blok maili w górę|up_right: górny prawy róg, blok maili w dół|up_left: górny lewy róg, blok maili w dół"
-
     YAD_LAYOUT_OPTIONS=$(echo "$BASE_LAYOUT_LIST" | tr '|' '\n' | sed "s/^$CURRENT_LAYOUT:/\^&/" | tr '\n' '!')
     YAD_LAYOUT_OPTIONS=${YAD_LAYOUT_OPTIONS%?}
 
+    # 2. Wyświetlenie okna
     FORM_OUTPUT=$(yad --form --center \
         --title="Konfiguracja Widgetu Mail" \
         --width=800 \
         --text-align=left \
-        --text="<b>Podgląd dostępnych układów:</b>\n$ASCII_PREVIEWS\n<b>Wybierz układ i skalowanie widgetu (0–150%):</b>" \
+        --text="<b>Podgląd dostępnych układów:</b>\n$ASCII_PREVIEWS\n<b>Skonfiguruj parametry widgetu:</b>" \
+        \
         --field="Układ:CB" \
             "$YAD_LAYOUT_OPTIONS" \
+        --field="Liczba maili:NUM" \
+            "$CURRENT_MAX_MAILS!1..200!1!0" \
         --field="Skalowanie (0–150%):NUM" \
             "$CURRENT_SCALE_PERCENT!0..150!1!0" \
+        --field="Szerokość widgetu (px):NUM" \
+            "$CURRENT_WIDTH!875..3820!1!0" \
+        \
+        --field="<b>Dodatkowe wiersze informacji:</b>:LBL" "" \
+        --field="Pokaż podgląd treści wiadomości (tekst maila):CHK" \
+            "$CHK_PREVIEW" \
+        --field="Pokaż stopkę techniczną (Data, IP, Operator):CHK" \
+            "$CHK_META" \
+        \
         --button="Zastosuj:0" \
+        --button="Przywróć Domyślne:2" \
         --button="Zamknij:1"
     )
     EXIT_CODE=$?
 
-    # Jeśli użytkownik kliknął "Zamknij" (kod 1) lub zamknął okno (kod 252), zakończ pętlę
-    if [ $EXIT_CODE -ne 0 ]; then
+    # Obsługa wyjścia (Anuluj, Zamknij okno)
+    if [ $EXIT_CODE -eq 1 ] || [ $EXIT_CODE -eq 252 ]; then
         break
     fi
 
-    # === PRZETWARZANIE DANYCH ===
-    IFS='|' read -r SELECTED_LAYOUT_FULL SCALE_VALUE _ <<< "$FORM_OUTPUT"
+    # Rozbicie danych z formularza na zmienne
+    IFS='|' read -r SELECTED_LAYOUT_FULL NEW_MAX_MAILS SCALE_VALUE NEW_WIDTH _LBL NEW_PREVIEW NEW_META _ <<< "$FORM_OUTPUT"
+    
     SELECTED_LAYOUT="${SELECTED_LAYOUT_FULL%%:*}"
-    SCALE_INTEGER="${SCALE_VALUE%.*}"
-    # Wymuś traktowanie SCALE_INTEGER jako liczby dziesiętnej (np. 075 → 75)
-    SCALE_INTEGER=$((10#$SCALE_INTEGER))
+    SCALE_INTEGER="${SCALE_VALUE%.*}" 
 
-    if [ -z "$SELECTED_LAYOUT" ] || [ -z "$SCALE_INTEGER" ]; then
-        notify-send "Mail Widget - Błąd" "Nie wybrano wartości. Spróbuj ponownie."
-        continue # Wróć na początek pętli
+    # === LOGIKA PRZYCISKU "PRZYWRÓĆ DOMYŚLNE" (KOD 2) ===
+    if [ $EXIT_CODE -eq 2 ]; then
+        
+        # 1. Sprawdzenie czy plik już ma wartości domyślne (porównanie ze stanem sprzed otwarcia okna)
+        IS_DEFAULT="FALSE"
+        if [ "$CURRENT_MAX_MAILS" == "5" ] && [ "$CURRENT_SCALE_PERCENT" == "100" ] && [ "$CURRENT_WIDTH" == "1275" ]; then
+            IS_DEFAULT="TRUE"
+        fi
+
+        if [ "$IS_DEFAULT" == "TRUE" ]; then
+             yad --center --width=300 \
+                --title="Informacja" \
+                --image="dialog-information" \
+                --text="<b>Widget jest już ustawiony na wartości domyślne.</b>\n\n(5 maili, 100% skali, 1275px szerokości)" \
+                --button="OK:0"
+             # Wracamy do początku pętli, nic nie zmieniamy
+             continue
+        fi
+
+        # 2. Pytanie o potwierdzenie
+        yad --center --width=400 \
+            --title="Potwierdzenie resetu" \
+            --image="dialog-question" \
+            --text="Czy na pewno chcesz przywrócić ustawienia domyślne?\n\n<b>Ustawi to:</b>\n- Liczba maili: 5\n- Skalowanie: 100%\n- Szerokość: 1275px" \
+            --button="Tak, przywróć:0" \
+            --button="Anuluj:1"
+        
+        CONFIRM_RESET=$?
+
+        if [ $CONFIRM_RESET -ne 0 ]; then
+            # Jeśli anulowano reset, wracamy do pętli (nie zapisujemy)
+            continue
+        fi
+
+        # 3. NADPISANIE ZMIENNYCH
+        # Zamiast zapisywać tu od razu, ustawiamy zmienne na sztywno.
+        NEW_MAX_MAILS=5
+        SCALE_INTEGER=100
+        NEW_WIDTH=1275
+        
+        # Komunikat dla użytkownika
+        notify-send "Mail Widget" "Przywracanie ustawień domyślnych..."
     fi
 
-    # === Obliczenia i modyfikacje plików (WERSJA BASH) ===
-    # Obliczanie nowego wymiaru z poprawnym zaokrągleniem matematycznym
-    NEW_WIDTH=$(((BASE_WIDTH * SCALE_INTEGER + 50) / 100))
-    NEW_HEIGHT=$(((BASE_HEIGHT * SCALE_INTEGER + 50) / 100))
+    # === WSPÓLNA SEKCJA ZAPISU (DLA ZASTOSUJ I PRZYWRÓĆ) ===
+    
+    # Walidacja
+    if [ -z "$SELECTED_LAYOUT" ] || [ -z "$SCALE_INTEGER" ] || [ -z "$NEW_MAX_MAILS" ] || [ -z "$NEW_WIDTH" ]; then
+        notify-send "Mail Widget - Błąd" "Nieprawidłowe dane. Spróbuj ponownie."
+        continue
+    fi
 
-    # Formatowanie współczynnika skali do postaci "1.57"
+    # Formatowanie skali (np. 105 -> 1.05)
     INTEGER_PART=$((SCALE_INTEGER / 100))
     FRACTIONAL_PART=$(printf "%02d" $((SCALE_INTEGER % 100)))
     FORMATTED_SCALE_FACTOR="${INTEGER_PART}.${FRACTIONAL_PART}"
 
-    ALIGN_VAL="${ALIGNMENTS[$SELECTED_LAYOUT]}"
-
-    # === Blok zapisu ===
+    # Edycja pliku LUA
     sed -i "s|^LAYOUT_MODE = \".*\"|LAYOUT_MODE = \"$SELECTED_LAYOUT\"|" "$LUA_FILE"
     sed -i "s|^GLOBAL_SCALE_FACTOR = .*|GLOBAL_SCALE_FACTOR = $FORMATTED_SCALE_FACTOR|" "$LUA_FILE"
-    sed -i "s|^\s*alignment\s*=.*|    alignment               = '$ALIGN_VAL',|" "$CONKY_FILE"
-    sed -i "s|^\s*minimum_width\s*=.*|    minimum_width           = $NEW_WIDTH,|" "$CONKY_FILE"
-    sed -i "s|^\s*minimum_height\s*=.*|    minimum_height          = $NEW_HEIGHT,|" "$CONKY_FILE"
+    sed -i "s|^MAX_MAILS = [0-9]*|MAX_MAILS = $NEW_MAX_MAILS|" "$LUA_FILE"
+    sed -i "s|^GLOBAL_WIDTH_MODIFIER = [0-9]*|GLOBAL_WIDTH_MODIFIER = $NEW_WIDTH|" "$LUA_FILE"
 
+    # Zapis opcji dodatkowych
+    save_lua_bool "SHOW_MAIL_PREVIEW" "$NEW_PREVIEW"
+    save_lua_bool "META_LINE_ENABLE"  "$NEW_META"
+
+    # Restart Conky
     pkill -u "$USER" -f "conky.*$CONKY_FILE"
 
-    # === Informacja zwrotna ===
+    # Powiadomienie
     INFO_MSG="Zastosowano zmiany:
 Układ: $SELECTED_LAYOUT
-Skala: ${SCALE_INTEGER}%
-Nowy rozmiar: ${NEW_WIDTH}x${NEW_HEIGHT}"
+Liczba maili: $NEW_MAX_MAILS
+Szerokość: ${NEW_WIDTH}px
+Skala: ${SCALE_INTEGER}%"
     
     notify-send "Mail Widget" "$INFO_MSG"
-    sleep 1 # Daj chwilę na restart conky
+    sleep 0.5
 
 done
 
-# === Sprzątanie po zakończeniu pętli ===
 notify-send "Mail Widget" "Konfigurator został zamknięty."
 echo "Konfigurator zamknięty."
-# Blokada pliku zostanie automatycznie zwolniona dzięki `trap`

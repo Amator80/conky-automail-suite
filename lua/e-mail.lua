@@ -1,20 +1,10 @@
 -- ====================================================================================
--- === SKALOWANIE WIDGETU - ZARZĄDZANE ZEWNĘTRZNIE ===
---
---                       !!! WAŻNE - NIE EDYTUJ RĘCZNIE !!!
---
--- Tym parametrem, oraz pozycją widgetu, zarządza dedykowany skrypt:
---          -> Konfiguracja_pozycji_layoutow_i_skali_conky.sh <-
--- Użyj go, aby dostosować rozmiar i położenie.
---
--- ----------------------------------------------------------------------------------
--- Dlaczego ta opcja musi być na samej górze?
--- Wiele opcji konfiguracyjnych poniżej (np. rozmiary czcionek, grubości ramek)
--- natychmiast używa tej wartości do obliczenia swoich wymiarów. Musi być ona
--- zdefiniowana jako pierwsza, aby reszta konfiguracji wczytała się poprawnie.
--- ----------------------------------------------------------------------------------
---
-GLOBAL_SCALE_FACTOR = 1.00
+-- === TECHNICZNE: AUTO-DETEKCJA ŚCIEŻKI (Musi być na samej górze!) ===
+-- ====================================================================================
+local script_path = debug.getinfo(1, "S").source:match("@(.*/)")
+package.path = package.path .. ";" .. script_path .. "?.lua"
+local project_dir = script_path .. "../"
+-- Tego bloku nie ruszaj i nie przenoś niżej, bo konfiguracja korzysta z 'project_dir'.
 -- ====================================================================================
 
 
@@ -31,6 +21,18 @@ GLOBAL_SCALE_FACTOR = 1.00
 #           											#
 #########################################################
 ]]
+
+-- ====================================================================================
+-- === SKALOWANIE I SZEROKOŚĆ (GLOBALNE USTAWIENIA) ===
+-- ====================================================================================
+GLOBAL_SCALE_FACTOR = 1.00
+
+-- GLOBALNA SZEROKOŚĆ (TOTAL WIDTH)
+-- Ustawiasz tutaj konkretną szerokość widgetu w pikselach.
+-- 1275 = rozmiar oryginalny (domyślny)
+-- 875  = rozmiar minimalny (najwęższy możliwy, zabezpieczony)
+-- 3820 = Max w konfiguratorze
+GLOBAL_WIDTH_MODIFIER = 1275
 
 -- ====================================================================================
 -- === GŁÓWNE TŁO WIDGETU ("MLEKO") ===
@@ -64,19 +66,23 @@ MAIL_SCROLL_FILE = "/dev/shm/conky-automail-suite/conky_mail_scroll_offset"
 SCROLL_TIMEOUT   = 15  -- sekundy; po tym czasie od ostatniej modyfikacji offset wraca do 0 (zazwyczaj timeouty nie skalujemy, bo czas to czas)
 
 --------------- LAYOUT - Globalne zmienne związane z działaniem layoutów -----------------------
-SHOW_SENDER_EMAIL = false              -- [true/false] Jeśli true, pokaże adres e-mail
-SHOW_MAIL_PREVIEW = true              -- [true/false] Jeśli true, pokaże fragment treści maila pod tematem
+
+-- [true/false] Jeśli true, pokaże adres e-mail
+SHOW_SENDER_EMAIL = false
+
+-- [true/false] Jeśli true, pokaże fragment treści maila pod tematem
+SHOW_MAIL_PREVIEW = true
 ----------------------------------------------------------------------------------------------------------------
 
 ------------------- DŹWIĘKI (nowa/znikająca wiadomość) -------------------
 NEW_MAIL_SOUND_ENABLE = true                                                     -- [true/false] Włącz dźwięk nowej wiadomości pocztowej
 MAIL_DISAPPEAR_SOUND_ENABLE = true                                               -- [true/false] Dźwięk przy znikaniu maila z listy
-NEW_MAIL_SOUND = "/home/linux/.git_projekt_mail/conky-automail-suite/sound/nowy_mail.wav"          -- Ścieżka do dźwięku nowej poczty (WAV)
-MAIL_DISAPPEAR_SOUND = "/home/linux/.git_projekt_mail/conky-automail-suite/sound/remove_mail.wav"  -- Ścieżka do dźwięku znikającego maila z listy (WAV)
+NEW_MAIL_SOUND = project_dir .. "sound/nowy_mail.wav"                            -- Ścieżka do dźwięku nowej poczty (WAV)
+MAIL_DISAPPEAR_SOUND = project_dir .. "sound/remove_mail.wav"                    -- Ścieżka do dźwięku znikającego maila z listy (WAV)
 
 ------------------- KOPERTA – IKONA GŁÓWNA -------------------
 SHOW_ENVELOPE_ICON = true                                                        -- [true/false] Pokazuj ikonę koperty
-ENVELOPE_IMAGE = "/home/linux/.git_projekt_mail/conky-automail-suite/icons/mail.png"               -- Ścieżka do obrazka koperty (PNG)
+ENVELOPE_IMAGE = project_dir .. "icons/mail.png"                                 -- Ścieżka do obrazka koperty (PNG)
 
 ENVELOPE_SIZE = { w = 141 * GLOBAL_SCALE_FACTOR, h = 141 * GLOBAL_SCALE_FACTOR } -- Rozmiar (szerokość, wysokość) koperty w px
 
@@ -96,9 +102,49 @@ MAIL_PREVIEW_SPACING = 7 * GLOBAL_SCALE_FACTOR    -- Odstęp pionowy między tem
 META_LINE_SPACING = 7 * GLOBAL_SCALE_FACTOR       -- Odstęp pionowy między preview a meta-linią (px, czyli trzecia linia)
 FROM_TO_SUBJECT_GAP = 12 * GLOBAL_SCALE_FACTOR    -- Odstęp poziomy między nadawcą a tematem (px)
 
+------------------- AWATARY (PROFILOWE) - KONFIGURACJA UŻYTKOWNIKA -------------------
+-- Włącz/Wyłącz system awatarów [true/false]
+SHOW_AVATARS = true
+
+-- Wielkość awatara (wymiar w pikselach)
+-- Ustawienie 0 wyłącza awatary (działa jak SHOW_AVATARS = false)
+AVATAR_SIZE = 65
+
+-- Prawy margines (odstęp między awatarem a tekstem)
+AVATAR_MARGIN_RIGHT = 15
+
+-- Kształt awatara: "circle" (Koło), "square" (Kwadrat), "rounded" (Zaokrąglony)
+AVATAR_SHAPE = "circle"
+
+-- Przeźroczystość awatara
+-- 1.0 = w pełni widoczny, 0.5 = półprzeźroczysty, 0.0 = niewidoczny
+AVATAR_ALPHA = 1.00
+
+-- Rysowanie obramowania awatara [true/false]
+DRAW_AVATAR_BORDER = false
+
+-- Grubość obramowania (px)
+AVATAR_BORDER_WIDTH = 2.5
+
+-- Kolor obramowania {R, G, B, Alpha} (Zakres 0-1 lub 0-255 - skrypt obsłuży oba)
+AVATAR_BORDER_COLOR = {0.224, 1, 0, 1.0}
+
+-- Ścieżki systemowe awatarów (zaawansowane)
+AVATAR_RAM_MAP_FILE = "/dev/shm/conky-automail-suite/avatar_map.json"
+AVATAR_TRIGGER_FILE = "/dev/shm/conky-automail-suite/avatar_trigger"
+AVATAR_DISK_MAP_FILE = project_dir .. "config/avatar_map.json"
+DEFAULT_AVATAR_PATH = project_dir .. "icons/user_default.png"
+
 ------------------- MLECZNA POŚWIATA POD KAŻDYM MAILEM – KONFIGURACJA -------------------
 -- Ten blok kontroluje WYGLĄD tła (kolor, ramkę, rogi) oraz jego WYMIARY POZIOME.
 -- Wymiary pionowe (wysokość i margines Y) są zarządzane w sekcji PROFILI WYSOKOŚCI poniżej.
+
+-- [ZABEZPIECZENIE WARTOŚCI SZEROKOŚCI]
+-- Zabezpieczenie przed ustawieniem zbyt małej szerokości. Min 875px.
+if GLOBAL_WIDTH_MODIFIER < 875 then
+    print("[INFO] GLOBAL_WIDTH_MODIFIER (" .. GLOBAL_WIDTH_MODIFIER .. ") jest zbyt niski. Ograniczono do 875, aby zapobiec błędom wizualnym.")
+    GLOBAL_WIDTH_MODIFIER = 875
+end
 
 -- Wypełnienie (kolor w środku)
 PER_MAIL_MILK_FILL_ENABLE = true                  -- [true/false] Włącza wypełnienie „mlekiem” pod każdym mailem
@@ -114,7 +160,9 @@ PER_MAIL_MILK_BORDER_WIDTH = 4 * GLOBAL_SCALE_FACTOR    -- Grubość ramki w pik
 -- Wygląd i wymiary poziome poświaty
 PER_MAIL_MILK_RADIUS =  15 * GLOBAL_SCALE_FACTOR     -- Zaokrąglenie rogów poświaty oraz ramki
 PER_MAIL_MILK_MARGIN_X = -30 * GLOBAL_SCALE_FACTOR   -- Dodatkowy margines na szerokość (ujemna wartość = większa poświata)
-PER_MAIL_MILK_WIDTH = 1102 * GLOBAL_SCALE_FACTOR     -- Szerokość poświaty (dopasuj do szerokości sekcji maili)
+
+-- [MODYFIKACJA] Obliczamy szerokość tła odejmując margines 173 od szerokości całkowitej
+PER_MAIL_MILK_WIDTH = (GLOBAL_WIDTH_MODIFIER - 173) * GLOBAL_SCALE_FACTOR     -- Szerokość poświaty
 
 ------------------- KONFIGURACJA PROFILI UKŁADU (DLA 1, 2 LUB 3 LINII) -------------------
 -- Zdefiniuj tutaj idealne wymiary dla każdego możliwego wariantu wyświetlania.
@@ -145,7 +193,7 @@ SPACING_3_LINES               = 96 * GLOBAL_SCALE_FACTOR    -- Całkowity odstę
 MARGIN_Y_3_LINES              = -23 * GLOBAL_SCALE_FACTOR   -- Korekta pionowa TŁA "mleka" (góra/dół)
 SENDER_OFFSET_Y_3_LINES       = 0 * GLOBAL_SCALE_FACTOR     -- Korekta pionowa linii Nadawca/Temat
 PREVIEW_OFFSET_Y_3_LINES      = 27 * GLOBAL_SCALE_FACTOR    -- Odstęp od góry bloku do linii podglądu (preview)
-META_OFFSET_Y_3_LINES         = 53 * GLOBAL_SCALE_FACTOR    -- Odstęp od góry bloku do linii z meta-danymi
+META_OFFSET_Y_3_LINES         = 53 * GLOBAL_SCALE_FACTOR    -- Odstęp od góry do linii z meta-danymi
 ATTACHMENT_ICON_OFFSET_3_LINES = { dx = -33 * GLOBAL_SCALE_FACTOR, dy = -15 * GLOBAL_SCALE_FACTOR } -- Przesunięcie ikony załącznika (x, y)
 ATTACHMENT_DOT_OFFSET_3_LINES  = { dx = -15 * GLOBAL_SCALE_FACTOR, dy = -15 * GLOBAL_SCALE_FACTOR } -- Przesunięcie kropki załącznika (x, y)
 
@@ -209,7 +257,9 @@ SUBJECT_FONT_BOLD = true                              -- [true/false] Czy temat 
 SUBJECT_FONT_ITALIC = false                           -- [true/false] Czy temat ma być pochylony?
 SUBJECT_COLOR_TYPE = "white"                          -- Kolor tematu: "white", "black", "custom"
 SUBJECT_COLOR_CUSTOM = {0.424, 1, 0}                  -- Własny kolor RGB tematu (gdy powyżej "custom")
-SUBJECT_MAX_WIDTH = 1065 * GLOBAL_SCALE_FACTOR        -- **Maksymalna szerokość pola tematu w px**
+
+-- [MODYFIKACJA] Odejmujemy margines 210 od szerokości całkowitej
+SUBJECT_MAX_WIDTH = (GLOBAL_WIDTH_MODIFIER - 210) * GLOBAL_SCALE_FACTOR        -- **Maksymalna szerokość pola tematu w px**
 
 -- PRZEWIJANIE TEMATU (Subject)
 SUBJECT_SCROLL_ENABLE = true                          -- [true/false] Czy przewijać temat jeśli się nie mieści?
@@ -222,12 +272,14 @@ SUBJECT_SCROLL_EXTRA = 36 * GLOBAL_SCALE_FACTOR       -- Dodatkowy bufor na koń
 
 ------------------- FORMATOWANIE "TREŚĆ PODGLĄDU" (PREVIEW) -------------------
 PREVIEW_FONT_NAME = "Arial"                           -- Czcionka podglądu (preview)
-PREVIEW_FONT_SIZE = 16 * GLOBAL_SCALE_FACTOR        -- Rozmiar czcionki podglądu
+PREVIEW_FONT_SIZE = 16 * GLOBAL_SCALE_FACTOR          -- Rozmiar czcionki podglądu
 PREVIEW_FONT_BOLD = true                              -- [true/false] Czy tekst preview ma być pogrubiony?
 PREVIEW_FONT_ITALIC = false                           -- [true/false] Czy tekst preview ma być pochylony?
 PREVIEW_COLOR_TYPE = "custom"                         -- Kolor preview: "white", "black", "custom"
 PREVIEW_COLOR_CUSTOM = {22, 217, 197}                 -- Własny kolor RGB (jeśli wybrałeś "custom")
-PREVIEW_MAX_WIDTH = 1065 * GLOBAL_SCALE_FACTOR        -- **Maksymalna szerokość pola preview w px**
+
+-- [MODYFIKACJA] Odejmujemy margines 210 od szerokości całkowitej
+PREVIEW_MAX_WIDTH = (GLOBAL_WIDTH_MODIFIER - 210) * GLOBAL_SCALE_FACTOR        -- **Maksymalna szerokość pola preview w px**
 
 -- PRZEWIJANIE PREVIEW
 PREVIEW_SCROLL_ENABLE = true                          -- [true/false] Czy przewijać podgląd jeśli za długi?
@@ -246,13 +298,27 @@ ALIAS_FONT_ITALIC = false                             -- [true/false] Czy tekst 
 -- UWAGA: Kolor aliasu ustawia się bezpośrednio w menedżerze kont podczas edycji.
 
 ------------------- BADGE (KÓŁKO Z LICZBĄ NIEPRZECZYTANYCH) -------------------
+SHOW_BADGE = true                                     -- [true/false] Pokazuj kółko z liczbą maili (badge)
+
+-- Tabela rozmiarów kółka (promień w px) w zależności od liczby cyfr.
+-- Skrypt sam dobierze wielkość (np. dla 1000 maili weźmie wartość [4]).
+-- UWAGA: Nie musisz mnożyć przez skalę, skrypt zrobi to sam!
+BADGE_RADIUS_BY_DIGITS = {
+    [1] = 22,   -- Rozmiar dla liczb 0-9 (1 cyfra)
+    [2] = 22,   -- Rozmiar dla liczb 10-99 (2 cyfry)
+    [3] = 22,   -- Rozmiar dla liczb 100-999 (3 cyfry)
+    [4] = 28,   -- Rozmiar dla liczb 1000-9999 (4 cyfry) -> powiększone
+    [5] = 34,   -- Rozmiar dla liczb 10000+ (5 cyfr)    -> jeszcze większe
+}
+
 BADGE_COLOR_TYPE = "red"                              -- Kolor środka badge: "red", "white", "black", "custom"
 BADGE_COLOR_CUSTOM = {22, 217, 197}                   -- Własny kolor RGB środka (jeśli powyżej "custom")
+
 BADGE_TEXT_COLOR_TYPE = "white"                       -- Kolor cyfry (liczby maili) na badge
 BADGE_TEXT_COLOR_CUSTOM = {255, 255, 0}               -- Własny kolor cyfry (gdy "custom")
+
 BADGE_BORDER_COLOR_TYPE = "white"                     -- Kolor obwódki badge
 BADGE_BORDER_COLOR_CUSTOM = {0, 255, 0}               -- Własny kolor obwódki (gdy "custom")
-SHOW_BADGE = true                                     -- [true/false] Pokazuj kółko z liczbą maili (badge)
 
 ------------------- KROPKA LUB IKONA ZAŁĄCZNIKA PRZY MAILU -------------------
 ATTACHMENT_DOT_ENABLE = false                         -- [true/false] Czy wyświetlać kropkę przy nadawcy, jeśli mail ma załącznik?
@@ -264,7 +330,7 @@ ATTACHMENT_ICON_ENABLE = true                         -- [true/false] Czy wyświ
 ATTACHMENT_ICON_SIZE = { w = 36 * GLOBAL_SCALE_FACTOR, h = 42 * GLOBAL_SCALE_FACTOR }      -- Rozmiar ikony (szerokość, wysokość)
 ATTACHMENT_ICON_ANGLE = 0                             -- Obrót ikony (w stopniach)
 ATTACHMENT_ICON_MIRROR = false                        -- [true/false] Lustrzane odbicie ikony
-ATTACHMENT_ICON_IMAGE = "/home/linux/.git_projekt_mail/conky-automail-suite/icons/spinacz1.png" -- Ścieżka do ikony (np. spinacz)
+ATTACHMENT_ICON_IMAGE = project_dir .. "icons/spinacz1.png" -- Ścieżka do ikony (np. spinacz)
 -- UWAGA: Pozycja ikony/kropki (OFFSET) została przeniesiona do KONFIGURACJA PROFILI UKŁADU (DLA 1, 2 LUB 3 LINII)
 
 
@@ -288,13 +354,16 @@ CUSTOM_TEXT_COLOR_CUSTOM = {255, 60, 0}  -- Własny kolor RGB tekstu (jeśli cus
 
 ------------------- SEPARATOR (LINIA OZDOBNA MIĘDZY NAGŁÓWKIEM A MAJLAMI) -------------------
 SEPARATOR_ENABLE = true               -- [true/false] Czy wyświetlać linię oddzielającą?
-SEPARATOR_LENGTH = 550 * GLOBAL_SCALE_FACTOR  -- Długość linii w px
+
+-- [MODYFIKACJA] Odejmujemy margines 725 od szerokości całkowitej
+SEPARATOR_LENGTH = (GLOBAL_WIDTH_MODIFIER - 725) * GLOBAL_SCALE_FACTOR  -- Długość linii w px
+
 SEPARATOR_COLOR_TYPE = "white"        -- Kolor linii: "white", "black", "custom"
 SEPARATOR_COLOR_CUSTOM = {150, 150, 150}  -- Własny kolor RGB (gdy "custom")
 SEPARATOR_WIDTH = 3 * GLOBAL_SCALE_FACTOR   -- Grubość linii (px)
 
 ------------------- 3 LINIA META (POD MAILEM – DANE TECHNICZNE, GODZINA, IP itp.) -------------------
-META_LINE_ENABLE = true   -- [true/false] Czy pokazywać trzecią linię pod każdym mailem (meta-info)
+META_LINE_ENABLE = true
 META_LINE_ORDER = {       -- Tutaj ustawiasz w jakiej kolejności będą wyświetlane informacje w meta-linii:
     "age_text",   -- ile temu (np. "2h temu")
     "hour",       -- godzina odebrania maila
@@ -314,7 +383,10 @@ META_SHOW_DATETIME = true   -- [true/false] Czy pokazywać datę/godzinę odebra
 META_SHOW_AGENT = true      -- [true/false] Czy pokazywać User-Agent (np. Thunderbird, Gmail)
 META_SHOW_COUNTRY = true    -- [true/false] Czy pokazywać kraj nadawcy
 META_SHOW_MOBILE = true     -- [true/false] Czy pokazywać "MOBILNY" jeśli mail wysłany przez sieć mobilną
-META_LINE_MAX_WIDTH = 1050 * GLOBAL_SCALE_FACTOR    -- **Maksymalna szerokość meta-linii w px**
+
+-- [MODYFIKACJA] Odejmujemy margines 225 od szerokości całkowitej
+META_LINE_MAX_WIDTH = (GLOBAL_WIDTH_MODIFIER - 225) * GLOBAL_SCALE_FACTOR    -- **Maksymalna szerokość meta-linii w px**
+
 META_LINE_SCROLL_ENABLE = true    -- [true/false] Czy przewijać meta-linię, jeśli za długa
 META_LINE_SCROLL_SPEED = 37 * GLOBAL_SCALE_FACTOR    -- Prędkość przewijania (px/s)
 META_LINE_SCROLL_REPEAT = 2         -- Ile razy przewinąć meta-linię
@@ -324,7 +396,7 @@ META_LINE_SCROLL_EASE = "easeOut" -- Styl przewijania: "easeOut" lub "linear"
 META_LINE_SCROLL_EXTRA = 36 * GLOBAL_SCALE_FACTOR        -- Bufor przewijania na końcu (px)
 
 -- Kolory poszczególnych informacji w meta-linii (podaj w formacie 0-1, np. 1 = 255)
-META_COLOR_IP = {144, 182, 238}       -- Kolor IP
+META_COLOR_IP = {144, 182, 238}         -- Kolor IP
 META_COLOR_CITY = {144, 182, 238}       -- Kolor miasta
 META_COLOR_ISP = {144, 182, 238}        -- Kolor operatora
 META_COLOR_AGE = {144, 182, 238}        -- Kolor "wiek maila"
@@ -354,9 +426,8 @@ META_DATE_FORMAT_CUSTOM = "%H:%M:%S %d.%m.%Y"      -- Twój własny format, jeś
 -- [[ OPTYMALIZACJA START ]]
 -- Zmienne do buforowania zawartości plików w pamięci
 local cached_mail_data = nil
-local last_mail_cache_mtime = 0
+local last_mail_cache_raw = nil -- Zmieniono z mtime na treść
 local cached_scroll_offset = 0
-local last_scroll_offset_mtime = 0
 -- [[ OPTYMALIZACJA KONIEC ]]
 
 if mail_widget_state == nil then
@@ -367,17 +438,22 @@ if mail_widget_state == nil then
         auto_reset_occurred = false
     }
 end
+    
 -- ====================================================================================
 --- OSTATECZNA POPRAWKA v5 KONIEC ---
-
--- Ustawienie ścieżki, aby Lua znalazła lokalny plik dkjson.lua
-local script_path = debug.getinfo(1, "S").source:match("@(.*/)")
-package.path = package.path .. ";" .. script_path .. "?.lua"
 
 require 'cairo'
 CAIRO_FORMAT_ARGB32 = 0
 pcall(require, 'cairo_xlib')
 local json = require("dkjson")
+
+-- ====================================================================================
+-- === FONTY SPECJALNE (Hybrid Rendering) ===
+-- ====================================================================================
+-- Font "Ratunkowy" dla znaków 3-bajtowych (strzałki, trójkąty itp.), których nie ma Arial ani Noto.
+-- DejaVu Sans Condensed jest zazwyczaj bezpiecznym wyborem w Linuxie.
+SYMBOL_FONT = "DejaVu Sans Condensed" 
+-- ==============================================================
 
 --- POCZĄTEK MODYFIKACJI ---
 -- ====================================================================================
@@ -578,7 +654,78 @@ LAYOUT_MODE = "down_left"
 -- dynamicznie i automatycznie nadpisywana przez wybraną funkcję layoutu
 -- (np. set_layout_down_left ustawia ją na "up").
 MAILS_DIRECTION = "up"
--- =========================================================================
+
+-- ====================================================================================
+-- === AUTOKOREKTA: AKTUALIZACJA CONKYRC NA PODSTAWIE LUA (Scale, MaxMails, Layout) ===
+-- ====================================================================================
+local function auto_update_conky_dimensions()
+    -- 1. Mapowanie layoutów (zgodne z Bash)
+    local alignments = {
+        ["down"]       = "bottom_middle",
+        ["up"]         = "top_middle",
+        ["down_left"]  = "bottom_left",
+        ["down_right"] = "bottom_right",
+        ["up_left"]    = "top_left",
+        ["up_right"]   = "top_right"
+    }
+
+    -- 2. Stałe bazowe
+    -- [MODYFIKACJA] GLOBAL_WIDTH_MODIFIER jest teraz naszą całkowitą szerokością
+    local BASE_WIDTH = GLOBAL_WIDTH_MODIFIER
+    local ROW_HEIGHT = 96
+    local MARGIN_HEIGHT = 30
+
+    -- 3. Obliczenia (Height = 30 + N * 96)
+    local calc_height = MARGIN_HEIGHT + (MAX_MAILS * ROW_HEIGHT)
+    if calc_height < 180 then calc_height = 180 end -- Minimum dla koperty
+
+    -- Aplikacja skali i zaokrąglanie
+    local final_width = math.floor((BASE_WIDTH * GLOBAL_SCALE_FACTOR) + 0.5)
+    local final_height = math.floor((calc_height * GLOBAL_SCALE_FACTOR) + 0.5)
+    local final_align = alignments[LAYOUT_MODE] or "bottom_left"
+
+    -- 4. Operacje na pliku conkyrc
+    local conkyrc_path = project_dir .. "conkyrc_mail"
+    local f = io.open(conkyrc_path, "r")
+    if not f then return end -- Brak pliku
+    local content = f:read("*a")
+    f:close()
+
+    -- Parsowanie obecnych wartości
+    local curr_w = tonumber(content:match("minimum_width%s*=%s*(%d+)"))
+    local curr_h = tonumber(content:match("minimum_height%s*=%s*(%d+)"))
+    local curr_align = content:match("alignment%s*=%s*['\"](.-)['\"]")
+
+    local changed = false
+
+    -- Sprawdzenie szerokości
+    if not curr_w or math.abs(curr_w - final_width) > 1 then
+        local cmd = string.format("sed -i 's/minimum_width.*/minimum_width           = %d,/' \"%s\"", final_width, conkyrc_path)
+        os.execute(cmd)
+        changed = true
+    end
+
+    -- Sprawdzenie wysokości
+    if not curr_h or math.abs(curr_h - final_height) > 1 then
+        local cmd = string.format("sed -i 's/minimum_height.*/minimum_height          = %d,/' \"%s\"", final_height, conkyrc_path)
+        os.execute(cmd)
+        changed = true
+    end
+
+    -- Sprawdzenie układu (alignment)
+    if curr_align ~= final_align then
+        local cmd = string.format("sed -i \"s/alignment.*/alignment               = '%s',/\" \"%s\"", final_align, conkyrc_path)
+        os.execute(cmd)
+        changed = true
+    end
+
+    if changed then
+        print("[AUTOKOREKTA] Zaktualizowano conkyrc: " .. final_width .. "x" .. final_height .. " @ " .. final_align)
+    end
+end
+-- Wywołanie autokorekty przy starcie skryptu
+auto_update_conky_dimensions()
+-- ====================================================================================
 
 -- =========================================================================
 -- === POPRAWKA WYCIEKU PAMIĘCI: Globalny obiekt do mierzenia tekstu      ===
@@ -651,7 +798,6 @@ function set_layout_up()
     MAILS_DIRECTION = "down"                                                         -- Kierunek rysowania listy maili (z góry na dół)
     ENVELOPE_MIRROR = true                                                           -- [true/false] Lustrzane odbicie ikony koperty
     ENVELOPE_IMAGE_ANGLE = 0                                                         -- Obrót koperty w stopniach
-    BADGE_RADIUS = 22 * GLOBAL_SCALE_FACTOR                                          -- Promień kółka z liczbą nieprzeczytanych maili
     BADGE_POS = { dx = 15 * GLOBAL_SCALE_FACTOR, dy = 7 * GLOBAL_SCALE_FACTOR }      -- Przesunięcie badge'a (kółka) względem koperty (oś X, oś Y)
     local ENV_X, ENV_Y = 126 * GLOBAL_SCALE_FACTOR, -25 * GLOBAL_SCALE_FACTOR        -- Korekta pozycji dla ikony koperty (oś X, oś Y)
     local MAIL_X, MAIL_Y = -37 * GLOBAL_SCALE_FACTOR, -60 * GLOBAL_SCALE_FACTOR      -- Korekta pozycji dla całej listy maili (oś X, oś Y)
@@ -682,7 +828,6 @@ function set_layout_down()
     MAILS_DIRECTION = "up"                                                           -- Kierunek rysowania listy maili (z góry na dół)
     ENVELOPE_MIRROR = true                                                           -- [true/false] Lustrzane odbicie ikony koperty
     ENVELOPE_IMAGE_ANGLE = 0                                                         -- Obrót koperty w stopniach
-    BADGE_RADIUS = 22 * GLOBAL_SCALE_FACTOR                                          -- Promień kółka z liczbą nieprzeczytanych maili
     BADGE_POS = { dx = 15 * GLOBAL_SCALE_FACTOR, dy = 7 * GLOBAL_SCALE_FACTOR }      -- Przesunięcie badge'a (kółka) względem koperty (oś X, oś Y)
     local ENV_X, ENV_Y = 132 * GLOBAL_SCALE_FACTOR, 22 * GLOBAL_SCALE_FACTOR         -- Korekta pozycji dla ikony koperty (oś X, oś Y)
     local MAIL_X, MAIL_Y = -45 * GLOBAL_SCALE_FACTOR, -52 * GLOBAL_SCALE_FACTOR      -- Korekta pozycji dla całej listy maili (oś X, oś Y)
@@ -712,8 +857,7 @@ function set_layout_up_left()
     -- LOKALNE KOREKTORY
     MAILS_DIRECTION = "down"                                                          -- Kierunek rysowania listy maili (z góry na dół)
     ENVELOPE_MIRROR = true                                                            -- [true/false] Lustrzane odbicie ikony koperty
-    ENVELOPE_IMAGE_ANGLE = 0                                                          -- Obrót koperty w stopniach
-    BADGE_RADIUS = 22 * GLOBAL_SCALE_FACTOR                                           -- Promień kółka z liczbą nieprzeczytanych maili
+    ENVELOPE_IMAGE_ANGLE = 0                                                          -- Obrót koperty w stopniach    
     BADGE_POS = { dx = 15 * GLOBAL_SCALE_FACTOR, dy = 7 * GLOBAL_SCALE_FACTOR }       -- Przesunięcie badge'a (kółka) względem koperty (oś X, oś Y)
     local ENV_X, ENV_Y = 132 * GLOBAL_SCALE_FACTOR, -22 * GLOBAL_SCALE_FACTOR         -- Korekta pozycji dla ikony koperty (oś X, oś Y)
     local MAIL_X, MAIL_Y = 0 * GLOBAL_SCALE_FACTOR, -60 * GLOBAL_SCALE_FACTOR         -- Korekta pozycji dla całej listy maili (oś X, oś Y)
@@ -738,8 +882,7 @@ function set_layout_up_right()
     -- LOKALNE KOREKTORY
     MAILS_DIRECTION = "down"                                                           -- Kierunek rysowania listy maili (z góry na dół)
     ENVELOPE_MIRROR = false                                                            -- [true/false] Lustrzane odbicie ikony koperty
-    ENVELOPE_IMAGE_ANGLE = 0                                                           -- Obrót koperty w stopniach
-    BADGE_RADIUS = 22 * GLOBAL_SCALE_FACTOR                                            -- Promień kółka z liczbą nieprzeczytanych maili
+    ENVELOPE_IMAGE_ANGLE = 0                                                           -- Obrót koperty w stopniach    
     BADGE_POS = { dx = 120 * GLOBAL_SCALE_FACTOR, dy = 7 * GLOBAL_SCALE_FACTOR }       -- Przesunięcie badge'a (kółka) względem koperty (oś X, oś Y)
     local ENV_X, ENV_Y = -185 * GLOBAL_SCALE_FACTOR, -22 * GLOBAL_SCALE_FACTOR         -- Korekta pozycji dla ikony koperty (oś X, oś Y)
     local MAIL_X, MAIL_Y = 75 * GLOBAL_SCALE_FACTOR, -63 * GLOBAL_SCALE_FACTOR         -- Korekta pozycji dla całej listy maili (oś X, oś Y)
@@ -767,7 +910,6 @@ function set_layout_down_left()
     MAILS_DIRECTION = "up"                                                            -- Kierunek rysowania listy maili (z góry na dół)
     ENVELOPE_MIRROR = true                                                            -- [true/false] Lustrzane odbicie ikony koperty
     ENVELOPE_IMAGE_ANGLE = 0                                                          -- Obrót koperty w stopniach
-    BADGE_RADIUS = 22 * GLOBAL_SCALE_FACTOR                                           -- Promień kółka z liczbą nieprzeczytanych maili
     BADGE_POS = { dx = 15 * GLOBAL_SCALE_FACTOR, dy = 7 * GLOBAL_SCALE_FACTOR }       -- Przesunięcie badge'a (kółka) względem koperty (oś X, oś Y)
     local ENV_X, ENV_Y = 135 * GLOBAL_SCALE_FACTOR, 30 * GLOBAL_SCALE_FACTOR          -- Korekta pozycji dla ikony koperty (oś X, oś Y)
     local MAIL_X, MAIL_Y = 0 * GLOBAL_SCALE_FACTOR, -52 * GLOBAL_SCALE_FACTOR         -- Korekta pozycji dla całej listy maili (oś X, oś Y)
@@ -794,7 +936,6 @@ function set_layout_down_right()
     MAILS_DIRECTION = "up"                                                              -- Kierunek rysowania listy maili (z góry na dół)
     ENVELOPE_MIRROR = false                                                             -- [true/false] Lustrzane odbicie ikony koperty
     ENVELOPE_IMAGE_ANGLE = 0                                                            -- Obrót koperty w stopniach
-    BADGE_RADIUS = 22 * GLOBAL_SCALE_FACTOR                                             -- Promień kółka z liczbą nieprzeczytanych maili
     BADGE_POS = { dx = 123 * GLOBAL_SCALE_FACTOR, dy = 7 * GLOBAL_SCALE_FACTOR }        -- Przesunięcie badge'a (kółka) względem koperty (oś X, oś Y)
     local ENV_X, ENV_Y = -185 * GLOBAL_SCALE_FACTOR , 30 * GLOBAL_SCALE_FACTOR          -- Korekta pozycji dla ikony koperty (oś X, oś Y)
     local MAIL_X, MAIL_Y = 75 * GLOBAL_SCALE_FACTOR, -52 * GLOBAL_SCALE_FACTOR          -- Korekta pozycji dla całej listy maili (oś X, oś Y)
@@ -869,33 +1010,90 @@ local function set_font(cr, font_name, font_size, bold, italic)
     cairo_set_font_size(cr, font_size)
 end
 
+-- =========================================================================
+-- === OPTYMALIZACJA: Cache dla split_emoji (HYBRID PARSER v2) ===
+-- =========================================================================
+local split_emoji_cache = {}
+
 local function split_emoji(text)
+    if not text then return {} end
+    if split_emoji_cache[text] then return split_emoji_cache[text] end
+
+    -- 1. Usuwamy modyfikatory skóry (Fitzpatrick type 1-6), bo Cairo ich nie lubi
+    -- Kody: F0 9F 8F [BB-BF]
+    local clean_text = text:gsub("\240\159\143[\187-\191]", "")
+
     local res = {}
-    local pattern = "[\xF0-\xF7][\x80-\xBF][\x80-\xBF][\x80-\xBF]"
-    local last_end = 1
-    for start_pos, end_pos in function() return text:find(pattern, last_end) end do
-        if start_pos > last_end then
-            table.insert(res, {emoji=false, txt=text:sub(last_end, start_pos-1)})
+    local len = #clean_text
+    local i = 1
+    
+    while i <= len do
+        local b = clean_text:byte(i)
+        local char_len = 1
+        local c_type = "text"
+
+        -- Analiza bajtów UTF-8 zgodnie z instrukcją
+        if b < 0x80 then 
+            char_len = 1        -- ASCII
+        elseif b < 0xE0 then 
+            char_len = 2        -- Znaki łacińskie rozszerzone, polskie itp. -> TEXT
+        elseif b < 0xF0 then
+            char_len = 3
+            c_type = "symbol"   -- 3-bajty (np. strzałki E2..) -> SYMBOL
+        else
+            char_len = 4
+            c_type = "emoji"    -- 4-bajty (np. emotki F0..) -> EMOJI
         end
-        table.insert(res, {emoji=true, txt=text:sub(start_pos, end_pos)})
-        last_end = end_pos + 1
+
+        -- Optymalizacja: Grupowanie znaków tego samego typu
+        local start_i = i
+        i = i + char_len
+        
+        while i <= len do
+            local nb = clean_text:byte(i)
+            local nlen = 1
+            local ntype = "text"
+            
+            if nb < 0x80 then nlen = 1
+            elseif nb < 0xE0 then nlen = 2
+            elseif nb < 0xF0 then nlen = 3; ntype = "symbol"
+            else nlen = 4; ntype = "emoji" end
+
+            if ntype == c_type then
+                i = i + nlen
+            else
+                break
+            end
+        end
+
+        table.insert(res, {type=c_type, txt=clean_text:sub(start_i, i-1)})
     end
-    if last_end <= #text then
-        table.insert(res, {emoji=false, txt=text:sub(last_end)})
-    end
+    
+    -- Cache limiter
+    local count = 0
+    for _ in pairs(split_emoji_cache) do count = count + 1 end
+    if count > 200 then split_emoji_cache = {} end
+    
+    split_emoji_cache[text] = res
     return res
 end
 
--- Liczenie szerokości tekstu z emoji
+-- Liczenie szerokości tekstu z obsługą hybrydową (Text / Symbol / Emoji)
 local function text_width_with_emoji(cr, text, font_name, font_size, font_bold, font_italic)
     local width = 0
-    local emoji_chunks = split_emoji(text)
-    for idx, chunk in ipairs(emoji_chunks) do
-        if chunk.emoji then
+    local chunks = split_emoji(text) -- Używa nowego parsera
+    
+    for idx, chunk in ipairs(chunks) do
+        if chunk.type == "emoji" then
             cairo_select_font_face(cr, "Noto Color Emoji", CAIRO_FONT_SLANT_NORMAL, font_bold and CAIRO_FONT_WEIGHT_BOLD or CAIRO_FONT_WEIGHT_NORMAL)
+        elseif chunk.type == "symbol" then
+            -- Tu ratujemy strzałki!
+            cairo_select_font_face(cr, SYMBOL_FONT or "DejaVu Sans", CAIRO_FONT_SLANT_NORMAL, font_bold and CAIRO_FONT_WEIGHT_BOLD or CAIRO_FONT_WEIGHT_NORMAL)
         else
+            -- Zwykły tekst
             cairo_select_font_face(cr, font_name, font_italic and CAIRO_FONT_SLANT_ITALIC or CAIRO_FONT_SLANT_NORMAL, font_bold and CAIRO_FONT_WEIGHT_BOLD or CAIRO_FONT_WEIGHT_NORMAL)
         end
+        
         cairo_set_font_size(cr, font_size)
         cairo_text_extents(cr, chunk.txt, GLOBAL_TEXT_EXTENTS)
         width = width + GLOBAL_TEXT_EXTENTS.x_advance
@@ -903,10 +1101,17 @@ local function text_width_with_emoji(cr, text, font_name, font_size, font_bold, 
     return width
 end
 
--- Obcinanie tekstu z emoji do max_width
+-- Obcinanie tekstu z emoji do max_width (Zaktualizowane)
 local function trim_line_to_width_emoji(cr, text, max_width, font_name, font_size, font_bold, font_italic)
     local ellipsis = "..."
+    
+    -- Szybkie sprawdzenie czy całość się mieści
+    if text_width_with_emoji(cr, text, font_name, font_size, font_bold, font_italic) <= max_width then
+        return text
+    end
+
     local trimmed = ""
+    -- Iterujemy po znakach UTF8, a nie bajtach
     for i = 1, utf8_len(text) do
         local chunk = utf8_sub(text, 1, i)
         local w = text_width_with_emoji(cr, chunk .. ellipsis, font_name, font_size, font_bold, font_italic)
@@ -915,15 +1120,12 @@ local function trim_line_to_width_emoji(cr, text, max_width, font_name, font_siz
         end
         trimmed = chunk
     end
-    -- Jeśli tekst się mieści, zwróć całość:
-    if text_width_with_emoji(cr, text, font_name, font_size, font_bold, font_italic) <= max_width then
-        return text
-    end
+    
     return trimmed .. ellipsis
 end
 
 
--- Sprawdź, czy to pierwszy start po reboocie (nie ma pliku last_seen)
+-- Sprawdź, czy, to pierwszy start po reboocie (nie ma pliku last_seen)
 local function file_exists(path)
     local ok, f = pcall(io.open, path, "r")
     if ok and f then f:close(); return true end
@@ -1096,51 +1298,45 @@ local last_known_mtime = 0
 
 
 -- [[ OPTYMALIZACJA START ]]
-    
-local function get_file_mtime(path)
-    if not path then return 0 end
-    -- ZASTOSOWANO NIEZAWODNE POLECENIE 'date' ZAMIAST 'stat'
-    local command = "LC_NUMERIC=C date -r '" .. path .. "' +%s.%N 2>/dev/null"
-    local handle = io.popen(command)
-    if handle then
-        local mtime_str = handle:read("*a")
-        handle:close()
-        -- Wynik jest już w poprawnym formacie (sekundy.nanosekundy),
-        -- więc wystarczy go przekonwertować na liczbę.
-        return tonumber(mtime_str) or 0
-    end
-    return 0
+
+-- =========================================================================
+-- === OPTYMALIZACJA: Bezpieczne i szybkie czytanie plików (BEZ SHELLA) ===
+-- =========================================================================
+local function read_file_content(path)
+    local f = io.open(path, "r")
+    if not f then return nil end
+    local s = f:read("*a")
+    f:close()
+    return s
 end
 
 local function fetch_mails_from_cache()
     local CACHE_FILE = "/dev/shm/conky-automail-suite/mail_cache.json"
     
-    local current_mtime = get_file_mtime(CACHE_FILE)
+    -- ZAMIAST sprawdzać datę przez powłokę, po prostu czytamy plik z RAMu.
+    -- To jest o rzędy wielkości szybsze niż "date -r" wywoływane przez popen.
+    local raw_content = read_file_content(CACHE_FILE)
 
-    if current_mtime > 0 and current_mtime == last_mail_cache_mtime and cached_mail_data ~= nil then
+    if raw_content and raw_content == last_mail_cache_raw and cached_mail_data ~= nil then
         last_mail_json_ok = true
         return cached_mail_data
     end
     
-    local f = io.open(CACHE_FILE, "r")
-    if not f then
+    if not raw_content then
         print("Nie znaleziono pliku cache!")
         last_mail_json_ok = false
         cached_mail_data = {} 
-        last_mail_cache_mtime = 0
+        last_mail_cache_raw = nil
         return {}
     end
     
-    local result = f:read("*a")
-    f:close()
-    
-    local data, pos, err = json.decode(result, 1, nil)
+    local data, pos, err = json.decode(raw_content, 1, nil)
     
     if not data or type(data) ~= "table" then
         print("Błąd dekodowania JSON z pliku cache:", err)
         last_mail_json_ok = false
         cached_mail_data = {}
-        last_mail_cache_mtime = 0
+        last_mail_cache_raw = nil
         return {}
     end
     
@@ -1148,7 +1344,7 @@ local function fetch_mails_from_cache()
     
     last_mail_json_ok = true
     cached_mail_data = data
-    last_mail_cache_mtime = current_mtime
+    last_mail_cache_raw = raw_content
     
     return cached_mail_data
 end
@@ -1156,7 +1352,7 @@ end
 
 
 local function save_max_mails_to_file()
-    local count_file = "/home/linux/Pulpit/conky-automail-suite/config/mail_count.conf"
+    local count_file = project_dir .. "config/mail_count.conf"
     local f = io.open(count_file, "w")
     if f then
         f:write(MAX_MAILS, "\n")
@@ -1166,7 +1362,7 @@ end
 save_max_mails_to_file()
 
 local function save_preview_lines_to_file()
-    local preview_file = "/home/linux/Pulpit/conky-automail-suite/config/mail_preview_lines.conf"
+    local preview_file = project_dir .. "config/mail_preview_lines.conf"
     local f = io.open(preview_file, "w")
     if f then
         f:write(MAIL_PREVIEW_LINES, "\n")
@@ -1196,10 +1392,24 @@ local function draw_png_rotated(cr, x, y, w, h, path, angle_deg, mirror_x)
     -- NIE niszczymy surface, bo cache!
 end
 
+    
 local function get_mail_id(mail)
+    -- POPRAWKA: Jeśli mail ma unikalny UID z serwera, użyj go.
+    -- To gwarantuje rozróżnienie nawet identycznych treściowo maili.
+    if mail.uid and tostring(mail.uid) ~= "" then
+        return tostring(mail.uid)
+    end
+
     local subj = tostring(mail.subject or ""):sub(1,64)
     local from = tostring(mail.from or ""):sub(1,32)
     local preview = tostring(mail.preview or ""):sub(1,32)
+    
+    -- POPRAWKA: Jeśli brak UID, dodaj timestamp (czas nadejścia).
+    -- Dzięki temu dwa identyczne maile, które przyszły w innym czasie, będą miały inne ID.
+    if mail.timestamp then
+        return subj .. "|" .. from .. "|" .. preview .. "|" .. tostring(mail.timestamp)
+    end
+
     return subj .. "|" .. from .. "|" .. preview
 end
 
@@ -1272,16 +1482,24 @@ end
 local function draw_emoji_text(cr, text, font_name, font_bold, font_size, x, y, font_italic)
     if not text or text == "" then return 0 end
     local cursor = x
-    local emoji_chunks = split_emoji(text)
-    for idx, chunk in ipairs(emoji_chunks) do
+    local chunks = split_emoji(text) -- Nowy parser
+    
+    for idx, chunk in ipairs(chunks) do
         cairo_move_to(cr, cursor, y)
-        if chunk.emoji then
+        
+        if chunk.type == "emoji" then
             cairo_select_font_face(cr, "Noto Color Emoji", CAIRO_FONT_SLANT_NORMAL, font_bold and CAIRO_FONT_WEIGHT_BOLD or CAIRO_FONT_WEIGHT_NORMAL)
+        elseif chunk.type == "symbol" then
+            -- Użycie fontu ratunkowego dla symboli 3-bajtowych
+            cairo_select_font_face(cr, SYMBOL_FONT or "DejaVu Sans", CAIRO_FONT_SLANT_NORMAL, font_bold and CAIRO_FONT_WEIGHT_BOLD or CAIRO_FONT_WEIGHT_NORMAL)
         else
+            -- Główny font dla tekstu
             cairo_select_font_face(cr, font_name, font_italic and CAIRO_FONT_SLANT_ITALIC or CAIRO_FONT_SLANT_NORMAL, font_bold and CAIRO_FONT_WEIGHT_BOLD or CAIRO_FONT_WEIGHT_NORMAL)
         end
+        
         cairo_set_font_size(cr, font_size)
         cairo_show_text(cr, chunk.txt)
+        
         cairo_text_extents(cr, chunk.txt, GLOBAL_TEXT_EXTENTS)
         cursor = cursor + GLOBAL_TEXT_EXTENTS.x_advance
     end
@@ -1306,25 +1524,32 @@ local function join_preview_lines(preview_txt, max_lines)
     return table.concat(lines, " ")
 end
 
+    
 local function get_mail_from_id(mail, from_txt)
-    local from_base = tostring(mail.from or "") .. "|" .. tostring(mail.from_name or "")
-    local subject = tostring(mail.subject or "")
-    return from_base:sub(1,64) .. "|" .. subject:sub(1,64) .. "|" .. (from_txt or "")
+    -- POPRAWKA: Używamy teraz funkcji get_mail_id jako bazy, 
+    -- która zawiera już UID lub timestamp.
+    return get_mail_id(mail) .. "|FROM_SCROLL|" .. (from_txt or "")
 end
 
 print("[diag] conky_parse:", type(_G.conky_parse))
 -- w okolicach definicji now_time() wstaw zamiast starej:
 local _tick_counter = 0
 local function now_time()
+    -- OPTYMALIZACJA: Unikamy conky_parse("${updates}") co klatkę, bo to kosztowne parsowanie stringów.
+    -- Jeśli conky_info jest dostępne (nowe wersje), używamy go.
     local dt = (type(_G.conky_info) == "table" and tonumber(_G.conky_info.update_interval)) or 1
-    if type(_G.conky_parse) == "function" then
+    local upd = 0
+    if type(_G.conky_info) == "table" and _G.conky_info.updates then
+        upd = tonumber(_G.conky_info.updates) or 0
+    elseif type(_G.conky_parse) == "function" then
+        -- Fallback tylko dla starszych wersji
         local ok, updates = pcall(_G.conky_parse, "${updates}")
-        local upd = tonumber(ok and updates or 0) or 0
-        return upd * dt
+        upd = tonumber(ok and updates or 0) or 0
     else
         _tick_counter = _tick_counter + 1
-        return _tick_counter * dt
+        upd = _tick_counter
     end
+    return upd * dt
 end
 
 -- =========================
@@ -1964,11 +2189,17 @@ local function segments_signature(segments)
     return table.concat(t, "\31")
 end
 
-local function draw_meta_line_rich(cr, mail, x, y, force_scroll_active)
+-- =============================================================
+-- === FIX: Dodano parametr dynamic_max_width (dynamiczna szerokość) ===
+-- =============================================================
+local function draw_meta_line_rich(cr, mail, x, y, force_scroll_active, dynamic_max_width)
     local meta_id = "meta|" .. (mail.uid or get_mail_id(mail))
     local now = now_time()
     local state = meta_scroll_states[meta_id]
     
+    -- Jeśli nie podano dynamicznej szerokości, użyj domyślnej
+    local current_max_width = dynamic_max_width or META_LINE_MAX_WIDTH
+
     -- [[ POPRAWKA PRZEWIJANIA v3 ]]
     if not state or state.last_mail_id ~= meta_id then
         state = {start_time=now, phase="start", rep=0, last_mail_id=meta_id}
@@ -1994,13 +2225,14 @@ local function draw_meta_line_rich(cr, mail, x, y, force_scroll_active)
         meta_width_cache[key] = total_width
     end
 
-    if total_width <= META_LINE_MAX_WIDTH or not META_LINE_SCROLL_ENABLE then
-        draw_meta_segments_trimmed(cr, segments, font_name, font_bold, font_size, font_italic, x, y, META_LINE_MAX_WIDTH)
+    -- Używamy calculated current_max_width zamiast globalnej stałej
+    if total_width <= current_max_width or not META_LINE_SCROLL_ENABLE then
+        draw_meta_segments_trimmed(cr, segments, font_name, font_bold, font_size, font_italic, x, y, current_max_width)
         return
     end
 
     local scroll_extra = META_LINE_SCROLL_EXTRA or (36 * GLOBAL_SCALE_FACTOR)
-    local scroll_len = total_width - META_LINE_MAX_WIDTH + scroll_extra
+    local scroll_len = total_width - current_max_width + scroll_extra
     if scroll_len < 1 then scroll_len = 1 end
     local delay_start  = META_LINE_SCROLL_DELAY or 0
     local pause_end = META_LINE_SCROLL_PAUSE_END or 0.25
@@ -2013,7 +2245,7 @@ local function draw_meta_line_rich(cr, mail, x, y, force_scroll_active)
 
     if phase == "start" then
         if elapsed < delay_start then
-            draw_meta_segments_trimmed(cr, segments, font_name, font_bold, font_size, font_italic, x, y, META_LINE_MAX_WIDTH)
+            draw_meta_segments_trimmed(cr, segments, font_name, font_bold, font_size, font_italic, x, y, current_max_width)
         else
             state.phase = "scroll"
             state.start_time = now
@@ -2025,9 +2257,10 @@ local function draw_meta_line_rich(cr, mail, x, y, force_scroll_active)
         local offset = ease_t * scroll_len
 
         cairo_save(cr)
-        cairo_rectangle(cr, x, y - font_size, META_LINE_MAX_WIDTH, font_size + (12 * GLOBAL_SCALE_FACTOR))
+        -- Clipowanie też musi uwzględniać aktualną szerokość
+        cairo_rectangle(cr, x, y - font_size, current_max_width, font_size + (12 * GLOBAL_SCALE_FACTOR))
         cairo_clip(cr)
-        draw_meta_segments_scrolling(cr, segments, font_name, font_bold, font_size, font_italic, x, y, META_LINE_MAX_WIDTH, offset)
+        draw_meta_segments_scrolling(cr, segments, font_name, font_bold, font_size, font_italic, x, y, current_max_width, offset)
         cairo_restore(cr)
 
         if t >= 1 then
@@ -2038,9 +2271,9 @@ local function draw_meta_line_rich(cr, mail, x, y, force_scroll_active)
     elseif phase == "pause_end" then
         if elapsed < pause_end then
             cairo_save(cr)
-            cairo_rectangle(cr, x, y - font_size, META_LINE_MAX_WIDTH, font_size + (12 * GLOBAL_SCALE_FACTOR))
+            cairo_rectangle(cr, x, y - font_size, current_max_width, font_size + (12 * GLOBAL_SCALE_FACTOR))
             cairo_clip(cr)
-            draw_meta_segments_scrolling(cr, segments, font_name, font_bold, font_size, font_italic, x, y, META_LINE_MAX_WIDTH, scroll_len)
+            draw_meta_segments_scrolling(cr, segments, font_name, font_bold, font_size, font_italic, x, y, current_max_width, scroll_len)
             cairo_restore(cr)
         else
             state.rep = state.rep + 1
@@ -2053,7 +2286,7 @@ local function draw_meta_line_rich(cr, mail, x, y, force_scroll_active)
         end
 
     elseif phase == "done" then
-        draw_meta_segments_trimmed(cr, segments, font_name, font_bold, font_size, font_italic, x, y, META_LINE_MAX_WIDTH)
+        draw_meta_segments_trimmed(cr, segments, font_name, font_bold, font_size, font_italic, x, y, current_max_width)
     end
 end
 
@@ -2098,24 +2331,12 @@ end
 
 -- [[ OPTYMALIZACJA START ]]
 local function read_mail_scroll_offset()
-    local current_mtime = get_file_mtime(MAIL_SCROLL_FILE)
-
-    if current_mtime > 0 and current_mtime == last_scroll_offset_mtime then
-        return cached_scroll_offset
-    end
-
+    -- ZAMIAST "date -r" (popen), CZYTAMY BEZPOŚREDNIO Z PLIKU
     local f = io.open(MAIL_SCROLL_FILE, "r")
-    local value = 0
-    if f then
-        local content = f:read("*a") or "0"
-        f:close()
-        value = tonumber(content:match("%-?%d+")) or 0
-    end
-
-    cached_scroll_offset = value
-    last_scroll_offset_mtime = current_mtime
-    
-    return value
+    if not f then return 0 end
+    local content = f:read("*a") or "0"
+    f:close()
+    return tonumber(content:match("%-?%d+")) or 0
 end
 -- [[ OPTYMALIZACJA KONIEC ]]
 
@@ -2150,6 +2371,228 @@ local function apply_mail_scroll(filtered_mails, MAX_MAILS, MAILS_DIRECTION)
 
     return out, offset, max_offset
 end
+
+-- ====================================================================================
+-- === FUNKCJE POMOCNICZE AWATARÓW (ZINTEGROWANE) ===
+-- ====================================================================================
+local avatar_map_cache = {}
+local last_trigger_value = -1
+local image_surface_cache = {}
+local image_cache_count = 0
+local MAX_CACHE_SIZE = 50
+local last_ram_check_time = 0
+
+local function cleanup_avatar_cache_if_needed()
+    if image_cache_count > MAX_CACHE_SIZE then
+        for k, v in pairs(image_surface_cache) do
+            cairo_surface_destroy(v)
+            image_surface_cache[k] = nil
+        end
+        image_surface_cache = {}
+        image_cache_count = 0
+    end
+end
+
+-- =========================================================================
+-- === OPTYMALIZACJA: Bezpieczne wczytywanie PNG bez io.open ===
+-- =========================================================================
+local function get_avatar_image(path)
+    if not path then return nil end
+    
+    -- 1. Najpierw sprawdź RAM (najszybciej)
+    if image_surface_cache[path] then 
+        return image_surface_cache[path] 
+    end
+    
+    cleanup_avatar_cache_if_needed()
+
+    -- 2. Zamiast otwierać plik io.open (co kosztuje I/O),
+    -- po prostu spróbuj go załadować przez Cairo. Jeśli nie istnieje lub jest uszkodzony,
+    -- Cairo ustawi odpowiedni status.
+    local surface = cairo_image_surface_create_from_png(path)
+    local status = cairo_surface_status(surface)
+    
+    if status == 0 then -- CAIRO_STATUS_SUCCESS
+        image_surface_cache[path] = surface
+        image_cache_count = image_cache_count + 1
+        return surface
+    else
+        -- Jeśli się nie udało (np. brak pliku), niszczymy pusty obiekt i zwracamy nil
+        cairo_surface_destroy(surface)
+        return nil
+    end
+end
+
+local function create_avatar_path(cr, x, y, size, shape)
+    cairo_new_path(cr)
+    if shape == "rounded" then
+        local radius = size * 0.25
+        cairo_move_to(cr, x + radius, y)
+        cairo_line_to(cr, x + size - radius, y)
+        cairo_curve_to(cr, x + size, y, x + size, y, x + size, y + radius)
+        cairo_line_to(cr, x + size, y + size - radius)
+        cairo_curve_to(cr, x + size, y + size, x + size, y + size, x + size - radius, y + size)
+        cairo_line_to(cr, x + radius, y + size)
+        cairo_curve_to(cr, x, y + size, x, y + size, x, y + size - radius)
+        cairo_line_to(cr, x, y + radius)
+        cairo_curve_to(cr, x, y, x, y, x + radius, y)
+        cairo_close_path(cr)
+    elseif shape == "square" then
+        cairo_rectangle(cr, x, y, size, size)
+    else 
+        local radius = size / 2
+        cairo_arc(cr, x + radius, y + radius, radius, 0, 2 * math.pi)
+    end
+end
+
+local function read_trigger_ram()
+    local f = io.open(AVATAR_TRIGGER_FILE, "r")
+    if not f then return 0 end
+    local val = f:read("*a")
+    f:close()
+    return tonumber(val) or 0
+end
+
+local function write_to_ram(content)
+    local f = io.open(AVATAR_RAM_MAP_FILE, "w")
+    if f then
+        f:write(content)
+        f:close()
+    end
+    local trig = io.open(AVATAR_TRIGGER_FILE, "w")
+    if trig then
+        trig:write(os.time())
+        trig:close()
+    end
+end
+
+local function ensure_avatar_map_loaded()
+    -- OPTYMALIZACJA: Sprawdzaj plik triggera max raz na sekundę, nie częściej!
+    local now = os.time()
+    if now == last_ram_check_time and next(avatar_map_cache) ~= nil then
+        return
+    end
+    last_ram_check_time = now
+
+    local current_trigger = read_trigger_ram()
+    
+    if current_trigger == last_trigger_value and next(avatar_map_cache) ~= nil then
+        return
+    end
+
+    -- Jeśli trigger się zmienił, czytamy mapę
+    local f = io.open(AVATAR_RAM_MAP_FILE, "r")
+    local loaded_from = "RAM"
+    local content = nil
+
+    if not f then
+        f = io.open(AVATAR_DISK_MAP_FILE, "r")
+        loaded_from = "DISK"
+    end
+
+    if not f then 
+        avatar_map_cache = {}
+        return 
+    end
+
+    content = f:read("*a")
+    f:close()
+    
+    local data, _, err = json.decode(content)
+    if type(data) == "table" then
+        avatar_map_cache = data
+        if loaded_from == "DISK" then
+            write_to_ram(content)
+            current_trigger = read_trigger_ram() 
+        end
+        last_trigger_value = current_trigger
+    else 
+        avatar_map_cache = {}
+    end
+end
+
+local function extract_email_from_string(full_string)
+    if not full_string then return "" end
+    -- Optymalizacja: najpierw szukaj w nawiasach, to najczęstszy format
+    local email = full_string:match("<(.-)>")
+    if not email then email = full_string:match("[%w%.%-_]+@[%w%.%-_]+") end
+    return email and email:lower() or ""
+end
+
+-- Lokalna funkcja rysująca awatar (dawniej w osobnym pliku)
+local function draw_avatar_local(cr, mail_from_raw, x, y, size)
+    -- Jeśli wyłączone lub błędny rozmiar -> natychmiast STOP
+    if not SHOW_AVATARS or (size == nil) or (size <= 0) then return end
+
+    -- [[ OPTYMALIZACJA ]] Usunięto wywołanie ensure_avatar_map_loaded() stąd.
+    -- Jest teraz wywoływane raz na klatkę w głównej funkcji.
+    
+    local email = extract_email_from_string(mail_from_raw)
+    local raw_value = avatar_map_cache[email]
+    
+    if not raw_value then raw_value = avatar_map_cache["DEFAULT_PROFILE"] end
+
+    local img_path = nil
+    if raw_value then
+        img_path = raw_value:match("^(.-)|") 
+        if not img_path then img_path = raw_value end
+    end
+
+    if not img_path or img_path == "" then img_path = DEFAULT_AVATAR_PATH end
+    if not img_path then return end 
+
+    -- Operacje graficzne
+    local surface = get_avatar_image(img_path)
+    if not surface then return end
+
+    local w = cairo_image_surface_get_width(surface)
+    local h = cairo_image_surface_get_height(surface)
+    
+    if w <= 0 or h <= 0 then return end
+
+    local shape = AVATAR_SHAPE or "circle"
+    
+    cairo_save(cr)
+    create_avatar_path(cr, x, y, size, shape)
+    cairo_save(cr)
+    cairo_clip(cr)
+    
+    local scale = math.max(size / w, size / h)
+    local trans_x = x + (size - (w * scale)) / 2
+    local trans_y = y + (size - (h * scale)) / 2
+    
+    cairo_translate(cr, trans_x, trans_y)
+    cairo_scale(cr, scale, scale)
+    cairo_set_source_surface(cr, surface, 0, 0)
+    
+    -- [ZMIANA] Używamy zmiennej AVATAR_ALPHA (lub 1.0 jeśli brak zmiennej)
+    cairo_paint_with_alpha(cr, AVATAR_ALPHA or 1.0)
+    
+    cairo_restore(cr)
+    
+    if DRAW_AVATAR_BORDER then
+        create_avatar_path(cr, x, y, size, shape)
+        local c = AVATAR_BORDER_COLOR
+        if c then
+            if #c >= 3 then
+                -- Obsługa formatu 0-1 (RGBA) lub 0-255
+                local r, g, b, a = c[1], c[2], c[3], c[4] or 1.0
+                if r > 1 or g > 1 or b > 1 then
+                    r, g, b = r/255, g/255, b/255
+                end
+                cairo_set_source_rgba(cr, r, g, b, a)
+            else
+               cairo_set_source_rgba(cr, 1, 1, 1, 1) 
+            end
+            cairo_set_line_width(cr, AVATAR_BORDER_WIDTH)
+            cairo_stroke(cr)
+        end
+    end
+
+    cairo_restore(cr)
+end
+
+-- ====================================================================================
 
 local function _conky_draw_mail_indicator_impl()
     if conky_window == nil then return end
@@ -2390,6 +2833,11 @@ local function _conky_draw_mail_indicator_impl()
     
     draw_main_background(cr)
     
+    -- [[ OPTYMALIZACJA ]] Wczytaj mapę avatarów RAZ na całą klatkę, a nie dla każdego maila
+    if SHOW_AVATARS then
+        ensure_avatar_map_loaded()
+    end
+    
     local current_time_for_drawing = now_time()
 
     draw_custom_user_text(cr)
@@ -2400,8 +2848,25 @@ local function _conky_draw_mail_indicator_impl()
     end
 
     if SHOW_BADGE and badge_count > 0 then
+        -- === LOGIKA: Dynamiczny rozmiar Badge z tabeli konfiguracji ===
+        local txt = tostring(badge_count)
+        local digits = #txt  -- liczba znaków (cyfr)
+        
+        -- Pobierz rozmiar z tabeli. Jeśli cyfr jest więcej niż w tabeli, weź ostatni dostępny (największy).
+        local max_defined = 0
+        for k,v in pairs(BADGE_RADIUS_BY_DIGITS) do
+            if k > max_defined then max_defined = k end
+        end
+        
+        local base_radius = BADGE_RADIUS_BY_DIGITS[digits] or BADGE_RADIUS_BY_DIGITS[max_defined] or 22
+        
+        -- Ustawienie globalnej zmiennej promienia (dla obliczeń pozycji)
+        BADGE_RADIUS = base_radius * GLOBAL_SCALE_FACTOR
+        -- ============================================================
+
         local badge_x = ENVELOPE_POS.x + (BADGE_POS.dx or (ENVELOPE_SIZE.w - BADGE_RADIUS + (3 * GLOBAL_SCALE_FACTOR)))
         local badge_y = ENVELOPE_POS.y + (BADGE_POS.dy or (-BADGE_RADIUS + (24 * GLOBAL_SCALE_FACTOR)))
+        
         cairo_arc(cr, badge_x, badge_y, BADGE_RADIUS, 0, 2*math.pi)
         set_color(cr, BADGE_COLOR_TYPE, BADGE_COLOR_CUSTOM)
         cairo_fill_preserve(cr)
@@ -2409,8 +2874,13 @@ local function _conky_draw_mail_indicator_impl()
         cairo_set_line_width(cr, 3.3 * GLOBAL_SCALE_FACTOR)
         cairo_stroke(cr)
         set_color(cr, BADGE_TEXT_COLOR_TYPE, BADGE_TEXT_COLOR_CUSTOM)
-        set_font(cr, FROM_FONT_NAME, FROM_FONT_SIZE + (4.5 * GLOBAL_SCALE_FACTOR), true, FROM_FONT_ITALIC)
-        local txt = tostring(badge_count)
+        
+        -- Opcjonalnie: zmniejsz czcionkę minimalnie, jeśli liczba jest bardzo długa (powyżej 3 cyfr)
+        local font_adjust = 0
+        if digits > 3 then font_adjust = -2 * GLOBAL_SCALE_FACTOR end
+
+        set_font(cr, FROM_FONT_NAME, FROM_FONT_SIZE + (4.5 * GLOBAL_SCALE_FACTOR) + font_adjust, true, FROM_FONT_ITALIC)
+        
         cairo_text_extents(cr, txt, GLOBAL_TEXT_EXTENTS)
         cairo_move_to(cr, badge_x - GLOBAL_TEXT_EXTENTS.width/2 - GLOBAL_TEXT_EXTENTS.x_bearing, badge_y + GLOBAL_TEXT_EXTENTS.height/2)
         cairo_show_text(cr, txt)
@@ -2438,6 +2908,33 @@ local function _conky_draw_mail_indicator_impl()
     for i = 1, num_mails do
         local mail = visible[i] or {}
         local y_offset = mail_positions[i]
+
+        -- =============================================================
+        -- === LOGIKA PRZESUNIĘCIA TREŚCI (ZINTEGROWANA Z AWATARAMI) ===
+        -- =============================================================
+        
+        -- Pobieramy wartości bezpośrednio ze zmiennych globalnych (po skalowaniu)
+        local real_avatar_size = (AVATAR_SIZE or 65) * GLOBAL_SCALE_FACTOR
+        local real_avatar_margin = (AVATAR_MARGIN_RIGHT or 15) * GLOBAL_SCALE_FACTOR
+        
+        -- SHOW_AVATARS działa, a ustawienie size=0 również wyłącza funkcję
+        local show_avatars_now = SHOW_AVATARS and (AVATAR_SIZE > 0)
+
+        local indent_x = 0
+        local milk_width_adjust = 0
+        
+        if show_avatars_now then
+            indent_x = real_avatar_size + real_avatar_margin
+            milk_width_adjust = indent_x
+        end
+        
+        -- Obliczamy nową szerokość tła i punkt startu tekstów
+        local base_milk_width = PER_MAIL_MILK_WIDTH or (1065 * GLOBAL_SCALE_FACTOR)
+        local current_milk_width = base_milk_width - milk_width_adjust
+        
+        -- To jest kluczowa zmienna - wszystkie teksty rysujemy od tego punktu
+        local draw_text_x = text_x + indent_x 
+        -- =============================================================
 
         local current_milk_height, current_milk_margin_y
         local current_preview_offset_y, current_meta_offset_y
@@ -2511,9 +3008,10 @@ local function _conky_draw_mail_indicator_impl()
             local should_draw_border = PER_MAIL_MILK_BORDER_ENABLE or (pulse_state.is_animating and PULSE_BORDER_ANIM_ENABLE)
 
             if should_draw_fill or should_draw_border then
-                local milk_x = text_x + (PER_MAIL_MILK_MARGIN_X or 0)
+                -- UWAGA: Tło rysujemy od przesuniętego X, z nową (węższą) szerokością
+                local milk_x = draw_text_x + (PER_MAIL_MILK_MARGIN_X or 0)
                 local milk_y = y_offset + (current_milk_margin_y or 0)
-                local milk_w = PER_MAIL_MILK_WIDTH or (1065 * GLOBAL_SCALE_FACTOR)
+                local milk_w = current_milk_width
                 local milk_h = current_milk_height or (82.5 * GLOBAL_SCALE_FACTOR)
                 local max_radius = math.min(milk_w, milk_h) / 2
                 local milk_radius = PER_MAIL_MILK_RADIUS
@@ -2528,24 +3026,41 @@ local function _conky_draw_mail_indicator_impl()
             end
         end
 
+        -- === RYSOWANIE AWATARA (SCALONE) ===
+        if show_avatars_now then
+            -- Pozycja Y wyśrodkowana względem wysokości tła
+            local av_y = y_offset + (current_milk_margin_y or 0) + (current_milk_height / 2) - (real_avatar_size / 2)
+            
+            -- Pozycja X w "luce" po lewej stronie (zaczynamy od oryginalnego text_x i dodajemy korektę)
+            local av_x = text_x + (PER_MAIL_MILK_MARGIN_X or 0) 
+            
+            local raw_from = mail.from_raw or mail.from or ""
+            
+            -- Wywołanie funkcji lokalnej (zamiast modułu)
+            draw_avatar_local(cr, raw_from, av_x, av_y, real_avatar_size)
+        end
+        -- ================================================================
+
         set_font(cr, FROM_FONT_NAME, FROM_FONT_SIZE, FROM_FONT_BOLD, FROM_FONT_ITALIC)
         local from_prefix = ""
         if mail.account_name and mail.account_name ~= "" then
             from_prefix = "[" .. mail.account_name .. "] "
         end
         local from_txt = from_prefix .. (mail.from or ""):gsub(":*$", "") .. ":"
-        local from_end = draw_from_scrolling(cr, mail, from_txt, text_x, y_offset + (current_sender_offset_y or 0), force_scroll_active)
+        
+        -- Używamy draw_text_x (przesuniętego)
+        local from_end = draw_from_scrolling(cr, mail, from_txt, draw_text_x, y_offset + (current_sender_offset_y or 0), force_scroll_active)
 
         if mail.has_attachment then
             local show_attach = attachment_blink_is_visible(mail, current_time_for_drawing)
             if show_attach then
                 if ATTACHMENT_ICON_ENABLE then
-                    local icon_x = text_x + (current_attachment_icon_offset.dx or 0)
+                    local icon_x = draw_text_x + (current_attachment_icon_offset.dx or 0)
                     local icon_y = (y_offset + (current_sender_offset_y or 0)) + (current_attachment_icon_offset.dy or 0)
                     draw_png_rotated(cr, icon_x, icon_y, ATTACHMENT_ICON_SIZE.w, ATTACHMENT_ICON_SIZE.h, ATTACHMENT_ICON_IMAGE, ATTACHMENT_ICON_ANGLE, ATTACHMENT_ICON_MIRROR)
                 end
                 if ATTACHMENT_DOT_ENABLE then
-                    local dot_x = text_x + (current_attachment_dot_offset.dx or 0)
+                    local dot_x = draw_text_x + (current_attachment_dot_offset.dx or 0)
                     local dot_y = (y_offset + (current_sender_offset_y or 0)) + (current_attachment_dot_offset.dy or 0) + FROM_FONT_SIZE/2
                     cairo_arc(cr, dot_x, dot_y, ATTACHMENT_DOT_RADIUS, 0, 2*math.pi)
                     set_color(cr, ATTACHMENT_DOT_COLOR_TYPE, ATTACHMENT_DOT_COLOR_CUSTOM)
@@ -2558,8 +3073,11 @@ local function _conky_draw_mail_indicator_impl()
         set_font(cr, SUBJECT_FONT_NAME, SUBJECT_FONT_SIZE, SUBJECT_FONT_BOLD, SUBJECT_FONT_ITALIC)
         local subject_txt = mail.subject or ""
         local subject_x = from_end + FROM_TO_SUBJECT_GAP
+        
+        -- Obliczamy szerokość z uwzględnieniem wcięcia
         draw_scrolling_text(
-            cr, "subject", mail, subject_txt, subject_x, y_offset + (current_sender_offset_y or 0), SUBJECT_MAX_WIDTH - (subject_x - text_x) - (18 * GLOBAL_SCALE_FACTOR),
+            cr, "subject", mail, subject_txt, subject_x, y_offset + (current_sender_offset_y or 0), 
+            SUBJECT_MAX_WIDTH - indent_x - (subject_x - draw_text_x) - (18 * GLOBAL_SCALE_FACTOR),
             SUBJECT_FONT_NAME, SUBJECT_FONT_SIZE, SUBJECT_FONT_BOLD, SUBJECT_FONT_ITALIC,
             {
                 scroll_enable = SUBJECT_SCROLL_ENABLE,
@@ -2578,10 +3096,19 @@ local function _conky_draw_mail_indicator_impl()
             set_color(cr, PREVIEW_COLOR_TYPE, PREVIEW_COLOR_CUSTOM)
             set_font(cr, PREVIEW_FONT_NAME, PREVIEW_FONT_SIZE, PREVIEW_FONT_BOLD, PREVIEW_FONT_ITALIC)
             local preview_line = join_preview_lines(mail.preview, MAIL_PREVIEW_LINES)
-            local preview_cursor = PREVIEW_INDENT and (text_x + (27 * GLOBAL_SCALE_FACTOR)) or text_x
+            
+            -- [POPRAWKA] Obliczamy wartość wcięcia raz i używamy jej do korekty X oraz SZEROKOŚCI
+            local indent_val = 0
+            if PREVIEW_INDENT then
+                indent_val = 27 * GLOBAL_SCALE_FACTOR
+            end
+
+            local preview_cursor = draw_text_x + indent_val
+            
+            -- Obliczamy szerokość: Odejmujemy indent_x (avatary) ORAZ indent_val (wcięcie preview)
             draw_scrolling_text(
                 cr, "preview", mail, preview_line, preview_cursor, preview_y,
-                PREVIEW_MAX_WIDTH - (18 * GLOBAL_SCALE_FACTOR),
+                PREVIEW_MAX_WIDTH - indent_x - indent_val - (18 * GLOBAL_SCALE_FACTOR),
                 PREVIEW_FONT_NAME, PREVIEW_FONT_SIZE, PREVIEW_FONT_BOLD, PREVIEW_FONT_ITALIC,
                 {
                     scroll_enable = PREVIEW_SCROLL_ENABLE,
@@ -2598,7 +3125,12 @@ local function _conky_draw_mail_indicator_impl()
 
         if META_LINE_ENABLE and current_meta_offset_y then
             local meta_y = y_offset + current_meta_offset_y
-            draw_meta_line_rich(cr, mail, text_x, meta_y, force_scroll_active)
+            -- === FIX META WIDTH START ===
+            -- Obliczamy dostępną szerokość dla meta linii (podobnie jak dla preview)
+            -- Jeśli są avatary, indent_x jest > 0, więc szerokość się zmniejszy.
+            local current_meta_width = META_LINE_MAX_WIDTH - indent_x
+            draw_meta_line_rich(cr, mail, draw_text_x, meta_y, force_scroll_active, current_meta_width)
+            -- === FIX META WIDTH END ===
         end
     end
 

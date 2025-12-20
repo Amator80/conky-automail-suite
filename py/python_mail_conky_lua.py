@@ -1,10 +1,14 @@
 # ==========================================================
-#  SKRYPT MAILFETCHER DLA CONKY/LUA - WERSJA Z WĄTKAMI POOLINGOWYMI
+#  SKRYPT MAILFETCHER DLA CONKY/LUA - WERSJA ASYNC GEOIP v2
 #  - Obsługa wielu kont e-mail w osobnych wątkach
 #  - Trwałe połączenia IMAP z NOOP
 #  - Proaktywne sprawdzanie sieci przez dedykowany wątek
 #  - Poprawka przewijania (flaga "is_new")
 #  - Wszystkie zaawansowane funkcje (GeoIP, diagnostyka etc.)
+#  - [NOWOŚĆ] OBSŁUGA ZASZYFROWANYCH HASEŁ (OpenSSL)
+#  - [UPDATE] KLUCZ SZYFRUJĄCY W KATALOGU UŻYTKOWNIKA (BEZPIECZEŃSTWO)
+#  - [MOD] GEOIP W TLE (ASYNC WORKER)
+#  - [FIX] LIVE UPDATE DANYCH GEOGRAFICZNYCH
 # ==========================================================
 import ipaddress
 import imaplib
@@ -25,6 +29,8 @@ from collections import Counter
 import socket
 import threading
 import signal
+import subprocess
+import queue  # <--- [NOWE] Potrzebne do kolejkowania zadań GeoIP
 
 # --- Lepsze parsowanie ---
 from email.utils import parsedate_to_datetime, parseaddr
@@ -34,6 +40,24 @@ try:
     from zoneinfo import ZoneInfo  # Python 3.9+
 except Exception:
     ZoneInfo = None
+
+# =================== GLOBALNE ŚCIEŻKI ===================
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Logika dla wersji Portable (Config w folderze projektu)
+# Zakładamy, że skrypt może być w głównym folderze lub w podkatalogu 'py'
+if os.path.isdir(os.path.join(SCRIPT_DIR, 'config')):
+    BASE_DIR = SCRIPT_DIR
+else:
+    BASE_DIR = os.path.dirname(SCRIPT_DIR)
+
+# 1. Konfiguracja kont (zostaje w projekcie - Portable)
+DEFAULT_CONFIG_PATH = os.path.join(BASE_DIR, 'config', 'config.json')
+SELECTOR_FILE_PATH = os.path.join(BASE_DIR, 'config', 'active_account_selector')
+
+# 2. Klucz szyfrujący (w bezpiecznym katalogu użytkownika - Security)
+USER_KEY_DIR = os.path.expanduser("~/.config/conky-mail-secret-key")
+SECRET_KEY_PATH = os.path.join(USER_KEY_DIR, '.secret_key')
 
 # =================== PARAMETRY / STAŁE ===================
 
@@ -48,15 +72,15 @@ ENABLE_GEOIP = True
 GEOIP_TIMEOUT_S = 1.5
 GEOIP_LOOKUPS_PER_TICK = 5  # zwiększ na czas testów (np. 999)
 
-# Cache plikowe (domyślne ścieżki)
+# Cache plikowe (domyślne ścieżki - w RAM dla wydajności)
 DEFAULT_GEOIP_CACHE_FILE = "/dev/shm/conky-automail-suite/mail_geoip.cache.json"
 DEFAULT_DIAG_FILE = "/dev/shm/conky-automail-suite/mail_diag.json"
 LAST_SEEN_FILE = "/dev/shm/conky-automail-suite/last_seen_mails.json"
 
 
 # Sieć: twardy timeout socketów
-SOCKET_TIMEOUT = 15  # s
-NETWORK_CHECK_TIMEOUT = 2 # s - dla is_internet_available
+SOCKET_TIMEOUT = 5  # s
+NETWORK_CHECK_TIMEOUT = 1.5 # s - dla is_internet_available
 NETWORK_MONITOR_INTERVAL = 5 # s - jak często wątek monitorujący sieć sprawdza status
 
 # --- KLUCZ PŁATNEGO GEOIP (PRIORYTET #2 – nadpisywalny przez CLI) ---
@@ -70,6 +94,11 @@ GEOIP_DEBUG_DEFAULT = True
 # Globalny event do kontrolowania działania wątków
 GLOBAL_RUNNING_EVENT = threading.Event()
 GLOBAL_RUNNING_EVENT.set() # Domyślnie ustawiony na uruchomiony
+
+# --- ASYNC GEOIP ---
+GEOIP_QUEUE = queue.PriorityQueue() # Kolejka PRIORYTETOWA (Newest First)
+_geoip_pending = set()      # Zbiór IP, które już są w kolejce (żeby nie duplikować)
+_geoip_pending_lock = threading.Lock()
 
 # ===============================================================
 #                                   KOLORY ANSI / FORMATOWANIE LOGU
@@ -107,6 +136,42 @@ def C(txt, *styles):
     codes = "".join(ANSI[s] for s in ANSI if s in styles)
     return f"{codes}{txt}{ANSI['reset']}"
 
+def get_ts():
+    """Zwraca aktualny czas w formacie [YYYY-MM-DD HH:MM:SS] do logów."""
+    return datetime.datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
+
+# ===============================================================
+#                                   DESZYFROWANIE HASEŁ
+# ===============================================================
+
+def decrypt_password(encrypted_pass):
+    """
+    Odszyfrowuje hasło przy użyciu klucza z pliku .secret_key (AES-256-CBC).
+    """
+    if not encrypted_pass:
+        return ""
+    
+    # Jeśli plik klucza nie istnieje, zakładamy, że hasło jest plaintext (kompatybilność)
+    if not os.path.exists(SECRET_KEY_PATH):
+        return encrypted_pass
+
+    try:
+        # Wywołanie: echo -n "..." | openssl enc -d -aes-256-cbc -salt -pbkdf2 -pass file:KEY -a -A
+        result = subprocess.run(
+            ['openssl', 'enc', '-d', '-aes-256-cbc', 
+             '-salt', '-pbkdf2', 
+             '-pass', f'file:{SECRET_KEY_PATH}', 
+             '-a', '-A'],
+            input=encrypted_pass.encode('utf-8'),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True
+        )
+        return result.stdout.decode('utf-8')
+    except Exception:
+        # W razie błędu (np. hasło nie było zaszyfrowane, tylko stare plaintext), zwróć oryginał
+        return encrypted_pass
+
 # ===============================================================
 #                                   GEOIP CACHE & LIMITER (ZAMKI!)
 # ===============================================================
@@ -115,6 +180,9 @@ _geoip_cache_mem = {}      # pamięć
 _geoip_cache_dirty = False  # czy zrzucić do pliku
 _geoip_budget = GEOIP_LOOKUPS_PER_TICK
 _last_budget_ts = 0.0
+
+# [NOWOŚĆ] Znacznik czasu ostatniej aktualizacji cache GeoIP
+_geoip_last_update_ts = 0.0 
 
 _geoip_cache_lock = threading.Lock() # Zamek dla dostępu do cache GeoIP i budżetu
 
@@ -318,7 +386,11 @@ def geoip_lookup(ip, cache_file=DEFAULT_GEOIP_CACHE_FILE, diag=None):
       - api.ipgeolocation.io (wymaga klucza – opcjonalny)
     Z pamięciowym cache i opcjonalnym logiem głosowania.
     """
-    global _geoip_cache_dirty
+    global _geoip_cache_dirty, _geoip_last_update_ts
+
+    # [FAST EXIT] Szybkie wyjście, jeśli trwa zamykanie
+    if not GLOBAL_RUNNING_EVENT.is_set():
+        return {}
 
     if diag is not None:
         diag['geoip_calls'] = diag.get('geoip_calls', 0) + 1
@@ -340,6 +412,8 @@ def geoip_lookup(ip, cache_file=DEFAULT_GEOIP_CACHE_FILE, diag=None):
 
     # --- źródła ---
     def from_ipwho(ip):
+        # [FAST EXIT]
+        if not GLOBAL_RUNNING_EVENT.is_set(): return {}
         t0 = time.perf_counter()
         try:
             with urllib.request.urlopen(f"https://ipwho.is/{ip}", timeout=GEOIP_TIMEOUT_S) as resp:
@@ -361,6 +435,8 @@ def geoip_lookup(ip, cache_file=DEFAULT_GEOIP_CACHE_FILE, diag=None):
                 diag['geoip_net_s_total'] = diag.get('geoip_net_s_total', 0.0) + (time.perf_counter() - t0)
 
     def from_ipapi(ip):
+        # [FAST EXIT]
+        if not GLOBAL_RUNNING_EVENT.is_set(): return {}
         t0 = time.perf_counter()
         try:
             with urllib.request.urlopen(
@@ -385,6 +461,8 @@ def geoip_lookup(ip, cache_file=DEFAULT_GEOIP_CACHE_FILE, diag=None):
                 diag['geoip_net_s_total'] = diag.get('geoip_net_s_total', 0.0) + (time.perf_counter() - t0)
 
     def from_ipinfo(ip):
+        # [FAST EXIT]
+        if not GLOBAL_RUNNING_EVENT.is_set(): return {}
         t0 = time.perf_counter()
         try:
             with urllib.request.urlopen(f"https://ipinfo.io/{ip}/json", timeout=GEOIP_TIMEOUT_S) as resp:
@@ -404,6 +482,8 @@ def geoip_lookup(ip, cache_file=DEFAULT_GEOIP_CACHE_FILE, diag=None):
                 diag['geoip_net_s_total'] = diag.get('geoip_net_s_total', 0.0) + (time.perf_counter() - t0)
 
     def from_ipgeolocation(ip):
+        # [FAST EXIT]
+        if not GLOBAL_RUNNING_EVENT.is_set(): return {}
         key = _FINAL_IPGEO_KEY or ""
         if not key or key in ("TWOJ_API_KEY_TUTAJ",):
             return {}
@@ -433,12 +513,20 @@ def geoip_lookup(ip, cache_file=DEFAULT_GEOIP_CACHE_FILE, diag=None):
             diag['geoip_skipped'] = diag.get('geoip_skipped', 0) + 1
         return {}
 
+    # [FAST EXIT]
+    if not GLOBAL_RUNNING_EVENT.is_set():
+        return {}
+
     providers = {
         "ipwho": from_ipwho(ip),
         "ipapi": from_ipapi(ip),
         "ipinfo": from_ipinfo(ip),
         "ipgeolocation": from_ipgeolocation(ip),
     }
+
+    # [FAST EXIT]
+    if not GLOBAL_RUNNING_EVENT.is_set():
+        return {}
 
     bad_isp_keywords = [
         "static","dynamic","broadband","unknown","no-rdns","internet","customer",
@@ -462,6 +550,8 @@ def geoip_lookup(ip, cache_file=DEFAULT_GEOIP_CACHE_FILE, diag=None):
     with _geoip_cache_lock: # Ochrona dostępu do _geoip_cache_mem
         _geoip_cache_mem[ip] = out
         _geoip_cache_dirty = True
+        # <<< ZMIANA: Aktualizujemy znacznik czasu, aby MAIN wiedział o nowym cache >>>
+        _geoip_last_update_ts = time.time()
 
     if GEOIP_DEBUG:
         _geoip_debug_log(ip, providers, out)
@@ -481,7 +571,7 @@ def load_config(config_path="config.json"):
     except FileNotFoundError:
         current_mtime = 0
 
-    # Szybka ścieżka: zwróć dane z bufora, jeśli plik się не zmienił
+    # Szybka ścieżka: zwróć dane z bufora, jeśli plik się nie zmienił
     if current_mtime > 0 and current_mtime == _config_cache_mtime and _config_cache_mem is not None:
         return _config_cache_mem
 
@@ -871,12 +961,22 @@ def has_mail_attachment(msg, diag=None):
         diag['attachments_check_s_total'] = diag.get('attachments_check_s_total', 0.0) + (time.perf_counter() - t0)
     return res
 
-def is_internet_available(host="1.1.1.1", port=53, timeout=NETWORK_CHECK_TIMEOUT):
-    """Szybko sprawdza, czy jest połączenie z internetem, unikając długich timeoutów."""
+# ZASTĄP CAŁĄ FUNKCJĘ is_internet_available TYM KODEM:
+
+def is_internet_available(host="8.8.8.8", port=53, timeout=NETWORK_CHECK_TIMEOUT):
+    """
+    Szybko sprawdza internet wymuszając IPv4 (AF_INET).
+    Używa 8.8.8.8 (Google DNS) zamiast nazw domenowych, aby pominąć narzut DNS.
+    """
     try:
-        with socket.create_connection((host, port), timeout=timeout):
-            return True
-    except (socket.timeout, OSError):
+        # Tworzymy socket ręcznie z rodziną AF_INET (tylko IPv4)
+        # To kluczowe przyspieszenie na systemach z włączonym ale nieskonfigurowanym IPv6
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(timeout)
+        s.connect((host, port))
+        s.close()
+        return True
+    except Exception:
         return False
 
 # Zamki dla dostępu do plików cache
@@ -1087,7 +1187,25 @@ def _build_mail_entry(raw_msg, preview_lines, sort_preview, include_meta, do_geo
         # age_text = get_age_text(mail_epoch) # <-- USUNIĘTA LINIA
         # =================================================================
         
-        ip_meta = geoip_lookup(ip, cache_file=geoip_cache_path, diag=diag) if (do_geoip and ip) else {}
+        # <<< ZMIANA: Zamiast blokującego geoip_lookup, sprawdzamy cache lub kolejkujemy >>>
+        ip_meta = {}
+        if do_geoip and ip:
+            with _geoip_cache_lock:
+                cached = _geoip_cache_mem.get(ip)
+            
+            if cached:
+                # Jeśli jest w cache, używamy natychmiast
+                ip_meta = cached
+                if diag is not None:
+                    diag['geoip_cache_hits'] = diag.get('geoip_cache_hits', 0) + 1
+            else:
+                # Jeśli nie ma, wrzucamy do kolejki dla GeoIPWorker (jeśli nie jest prywatny)
+                if not is_private_ipv4(ip) and not is_ipv6(ip):
+                    with _geoip_pending_lock:
+                        if ip not in _geoip_pending:
+                            _geoip_pending.add(ip)
+                            GEOIP_QUEUE.put(ip)
+
         meta = {
             "datetime": mail_dt,
             # "age_text": age_text, # <-- USUNIĘTA LINIA
@@ -1142,6 +1260,10 @@ def get_last_mails_imap(imap_conn, email_conf, n=6, show_all=False, preview_line
 
     per_uid_fallbacks = 0
     for uid, raw_msg in zip(reversed(uids), reversed(raws)):
+        # [FAST EXIT]
+        if not GLOBAL_RUNNING_EVENT.is_set():
+            break
+
         uid_str = uid.decode() if isinstance(uid, (bytes, bytearray)) else str(uid)
         if raw_msg is None:
             t0_f = time.perf_counter()
@@ -1250,31 +1372,82 @@ def _append_diag_array(diag: dict, path: str):
 #                           THREAD: InternetMonitor
 # ===============================================================
 
+# ZASTĄP CAŁĄ KLASĘ InternetMonitor TYM KODEM:
+
 class InternetMonitor(threading.Thread):
     def __init__(self, global_running_event):
         super().__init__(daemon=True)
-        self.online = False
         self._global_running_event = global_running_event
-        print(f"{C('[InternetMonitor]', 'teal')} Startuję monitor internetu.")
+        # Wykonaj szybki test startowy, zamiast zakładać True w ciemno
+        # (ale z krótkim timeoutem, żeby nie blokować startu UI)
+        self.online = is_internet_available(timeout=1.0)
+        status_str = "DOSTĘPNY" if self.online else "NIEDOSTĘPNY"
+        print(f"{get_ts()} {C('[InternetMonitor]', 'teal')} Startuję. Status początkowy: {status_str}")
 
     def run(self):
         while self._global_running_event.is_set():
+            # Sprawdź status
             current_status = is_internet_available()
+            
             if current_status != self.online:
                 self.online = current_status
                 if self.online:
-                    print(f"{C('[InternetMonitor]', 'teal')} Internet DOSTĘPNY.")
+                    print(f"{get_ts()} {C('[InternetMonitor]', 'teal')} Internet POWRÓCIŁ.")
                 else:
-                    print(f"{C('[InternetMonitor]', 'teal')} Internet NIEDOSTĘPNY.", file=sys.stderr)
-            time.sleep(NETWORK_MONITOR_INTERVAL)
-        print(f"{C('[InternetMonitor]', 'teal')} Zakończono działanie.")
+                    print(f"{get_ts()} {C('[InternetMonitor]', 'teal')} Internet UTRACONY.", file=sys.stderr)
+            
+            # Czekaj na kolejny cykl (z obsługą szybkiego wyjścia)
+            for _ in range(NETWORK_MONITOR_INTERVAL * 2):
+                if not self._global_running_event.is_set():
+                    break
+                time.sleep(0.5)
+                
+        print(f"{get_ts()} {C('[InternetMonitor]', 'teal')} Zakończono działanie.")
+
+# ===============================================================
+#                           THREAD: GeoIPWorker (NOWE)
+# ===============================================================
+
+class GeoIPWorker(threading.Thread):
+    """
+    Wątek pobierający dane GeoIP w tle z kolejki.
+    """
+    def __init__(self, global_running_event, cache_path):
+        super().__init__(daemon=True)
+        self._global_running_event = global_running_event
+        self.cache_path = cache_path
+        print(f"{C('[GeoIPWorker]', 'magenta')} Startuję worker GeoIP w tle.")
+
+    def run(self):
+        while self._global_running_event.is_set():
+            try:
+                # Pobierz element z kolejki. PriorityQueue zwraca (priorytet, ip).
+                # Interesuje nas tylko IP.
+                item = GEOIP_QUEUE.get(timeout=1.0)
+                _, ip = item 
+                
+                # Wykonaj lookup (zarządza swoim zamkiem i budżetem)
+                geoip_lookup(ip, self.cache_path, diag=None)
+                
+                # Usuń z pending (ważne dla logiki anty-duplikatów)
+                with _geoip_pending_lock:
+                    _geoip_pending.discard(ip)
+                
+                GEOIP_QUEUE.task_done()
+                
+            except queue.Empty:
+                continue
+            except Exception as e:
+                print(f"{get_ts()} {C('[GeoIPWorker]', 'red')} Błąd workera: {e}", file=sys.stderr)
+                time.sleep(1)
+        
+        print(f"{get_ts()} {C('[GeoIPWorker]', 'magenta')} Zakończono działanie.")
 
 # ===============================================================
 #                           THREAD: AccountWorker
 # ===============================================================
 
 class AccountWorker(threading.Thread):
-    # ================== POCZĄTEK ZMIAN ==================
     def __init__(self, account_conf, global_config, internet_monitor_ref, diag_file_lock, global_running_event, initial_state=None):
         super().__init__(daemon=True)
         self.account_conf = account_conf
@@ -1307,8 +1480,7 @@ class AccountWorker(threading.Thread):
         self.login_id = self.account_conf.get("login") or "Nieznane"
         
         socket.setdefaulttimeout(SOCKET_TIMEOUT)
-        print(f"{C(f'[AccountWorker {self.login_id}]', 'purple')} Startuję wątek dla konta.")
-    # ================== KONIEC ZMIAN ==================
+        print(f"{get_ts()} {C(f'[AccountWorker {self.login_id}]', 'purple')} Startuję wątek dla konta.")
 
     def run(self):
         while self._global_running_event.is_set() and not self._stop_event.is_set():
@@ -1321,7 +1493,7 @@ class AccountWorker(threading.Thread):
 
             if not self.internet_monitor.online:
                 current_loop_error = f"Brak połączenia z internetem dla konta {self.login_id}. Próbuję ponownie za chwilę."
-                print(f"{C('[WARN]', 'red')} [AccountWorker {self.login_id}] {current_loop_error}")
+                print(f"{get_ts()} {C('[WARN]', 'red')} [AccountWorker {self.login_id}] {current_loop_error}")
                 self._disconnect_imap()
                 self.last_known_state["last_error"] = current_loop_error
                 self._connected = False
@@ -1335,7 +1507,7 @@ class AccountWorker(threading.Thread):
                     self.last_known_state["last_error"] = None
                 except Exception as e:
                     current_loop_error = f"Błąd połączenia/logowania IMAP dla konta {self.login_id}: {e}"
-                    print(f"{C('[ERROR]', 'red', 'bold')} [AccountWorker {self.login_id}] {current_loop_error}", file=sys.stderr)
+                    print(f"{get_ts()} {C('[ERROR]', 'red', 'bold')} [AccountWorker {self.login_id}] {current_loop_error}", file=sys.stderr)
                     self._connected = False
                     self.last_known_state["last_error"] = current_loop_error
                     self._disconnect_imap()
@@ -1347,7 +1519,7 @@ class AccountWorker(threading.Thread):
                     self._imap_conn.noop()
             except (imaplib.IMAP4.error, socket.timeout, ConnectionRefusedError, socket.gaierror) as e:
                 current_loop_error = f"Połączenie IMAP zerwane dla konta {self.login_id} (NOOP failed): {e}"
-                print(f"{C('[WARN]', 'yellow')} [AccountWorker {self.login_id}] {current_loop_error}", file=sys.stderr)
+                print(f"{get_ts()} {C('[WARN]', 'yellow')} [AccountWorker {self.login_id}] {current_loop_error}", file=sys.stderr)
                 self._connected = False
                 self.last_known_state["last_error"] = current_loop_error
                 self._disconnect_imap()
@@ -1355,7 +1527,7 @@ class AccountWorker(threading.Thread):
                 continue
             except Exception as e:
                 current_loop_error = f"Nieoczekiwany błąd podczas NOOP dla konta {self.login_id}: {e}"
-                print(f"{C('[ERROR]', 'red', 'bold')} [AccountWorker {self.login_id}] {current_loop_error}", file=sys.stderr)
+                print(f"{get_ts()} {C('[ERROR]', 'red', 'bold')} [AccountWorker {self.login_id}] {current_loop_error}", file=sys.stderr)
                 self._connected = False
                 self.last_known_state["last_error"] = current_loop_error
                 self._disconnect_imap()
@@ -1363,6 +1535,11 @@ class AccountWorker(threading.Thread):
                 continue
 
             try:
+                # [FAST EXIT]
+                if not self._global_running_event.is_set():
+                    break
+                
+                # --- FAZA 1: Szybkie pobieranie maili (bez czekania na GeoIP) ---
                 mails_result = get_last_mails_imap(
                     imap_conn=self._imap_conn,
                     email_conf=self.account_conf,
@@ -1371,10 +1548,12 @@ class AccountWorker(threading.Thread):
                     preview_lines=self.global_config["preview_lines"],
                     sort_preview=self.global_config["sort_preview"],
                     include_meta=True,
-                    do_geoip=self.global_config["do_geoip"],
+                    do_geoip=False, # <-- WAŻNE: Nie blokujemy tutaj!
                     geoip_cache_path=self.global_config["geoip_cache_path"],
                     diag=diag
                 )
+                
+                # Aktualizujemy stan od razu, żeby użytkownik widział nowe maile
                 self.last_known_state = {
                     "account_name": self.account_conf.get("name", "Nieznane"),
                     "unread": mails_result.get("unread", 0),
@@ -1383,18 +1562,55 @@ class AccountWorker(threading.Thread):
                     "mails": mails_result.get("mails", []),
                     "last_error": None
                 }
-                print(f"{C('[OK]', 'green')} [AccountWorker {self.login_id}] Sprawdzono. Nieprzeczytane: {self.last_known_state['unread']}/{self.last_known_state['all']}")
+                print(f"{get_ts()} {C('[OK]', 'green')} [AccountWorker {self.login_id}] Sprawdzono. Nieprzeczytane: {self.last_known_state['unread']}/{self.last_known_state['all']}")
+
+                # --- FAZA 2: Zlecanie GeoIP z priorytetem (Async Priority Enqueue) ---
+                if self.global_config["do_geoip"]:
+                    for mail in self.last_known_state["mails"]:
+                        if not self._global_running_event.is_set():
+                            break
+                        
+                        meta = mail.get("meta", {})
+                        ip = meta.get("ip")
+                        timestamp = mail.get("timestamp", 0)
+
+                        # Warunki:
+                        # 1. Jest IP
+                        # 2. Nie ma jeszcze kraju (czyli nie było w cache podczas Fazy 1)
+                        # 3. IP nie jest prywatne (szkoda kolejki na LAN)
+                        if ip and not meta.get("country") and not is_private_ipv4(ip):
+                            
+                            # Sprawdzamy, czy IP już nie czeka w kolejce (anty-duplikat)
+                            with _geoip_pending_lock:
+                                if ip not in _geoip_pending:
+                                    
+                                    # Ostatnie szybkie sprawdzenie cache (może inny wątek właśnie to zrobił)
+                                    with _geoip_cache_lock:
+                                        cached = _geoip_cache_mem.get(ip)
+                                    
+                                    # Jeśli nadal brak w cache -> kolejka
+                                    if not cached:
+                                        _geoip_pending.add(ip)
+                                        
+                                        # Obliczamy priorytet:
+                                        # Kolejka PriorityQueue wyciąga najmniejsze liczby najpierw.
+                                        # Chcemy, żeby najnowsze maile (duży timestamp) były pierwsze.
+                                        # Więc używamy ujemnego timestampa.
+                                        priority = -int(timestamp) if timestamp else 0
+                                        
+                                        # Wrzucamy krotkę (priorytet, ip)
+                                        GEOIP_QUEUE.put((priority, ip))
 
             except (imaplib.IMAP4.error, socket.timeout, ConnectionRefusedError, socket.gaierror) as e:
                 current_loop_error = f"Błąd pobierania maili IMAP dla konta {self.login_id}: {e}"
-                print(f"{C('[ERROR]', 'red', 'bold')} [AccountWorker {self.login_id}] {current_loop_error}", file=sys.stderr)
+                print(f"{get_ts()} {C('[ERROR]', 'red', 'bold')} [AccountWorker {self.login_id}] {current_loop_error}", file=sys.stderr)
                 self._connected = False
                 self.last_known_state["last_error"] = current_loop_error
                 self._disconnect_imap()
                 time.sleep(SOCKET_TIMEOUT)
             except Exception as e:
                 current_loop_error = f"Nieoczekiwany błąd pobierania maili dla konta {self.login_id}: {e}"
-                print(f"{C('[ERROR]', 'red', 'bold')} [AccountWorker {self.login_id}] {current_loop_error}", file=sys.stderr)
+                print(f"{get_ts()} {C('[ERROR]', 'red', 'bold')} [AccountWorker {self.login_id}] {current_loop_error}", file=sys.stderr)
                 self._connected = False
                 self.last_known_state["last_error"] = current_loop_error
                 self._disconnect_imap()
@@ -1405,8 +1621,18 @@ class AccountWorker(threading.Thread):
             
             time.sleep(self.global_config["polling_interval"])
 
+        # [FAST EXIT]
+        if not self._global_running_event.is_set():
+            if self._imap_conn:
+                try:
+                    self._imap_conn.socket().close()
+                except Exception:
+                    pass
+            print(f"{get_ts()} {C(f'[AccountWorker {self.login_id}]', 'purple')} Zakończono natychmiast (Fast Exit).")
+            return
+
         self._disconnect_imap()
-        print(f"{C(f'[AccountWorker {self.login_id}]', 'purple')} Zakończono działanie.")
+        print(f"{get_ts()} {C(f'[AccountWorker {self.login_id}]', 'purple')} Zakończono działanie.")
 
     def _connect_imap(self):
         encryption_type = self.account_conf.get("encryption", "ssl").lower()
@@ -1419,17 +1645,21 @@ class AccountWorker(threading.Thread):
 
         try:
             if encryption_type == "starttls":
-                print(f"{C('[INFO]', 'cyan')} [AccountWorker {self.login_id}] Łączenie z {host}:{port} (tryb STARTTLS)...")
+                print(f"{get_ts()} {C('[INFO]', 'cyan')} [AccountWorker {self.login_id}] Łączenie z {host}:{port} (tryb STARTTLS)...")
                 conn = imaplib.IMAP4(host, port, timeout=SOCKET_TIMEOUT)
                 conn.starttls()
             else:
-                print(f"{C('[INFO]', 'cyan')} [AccountWorker {self.login_id}] Łączenie z {host}:{port} (tryb SSL/TLS)...")
+                print(f"{get_ts()} {C('[INFO]', 'cyan')} [AccountWorker {self.login_id}] Łączenie z {host}:{port} (tryb SSL/TLS)...")
                 conn = imaplib.IMAP4_SSL(host, port, timeout=SOCKET_TIMEOUT)
             
-            conn.login(self.account_conf["login"], self.account_conf["password"])
+            # [ZMIANA] Odszyfrowanie hasła przed wysłaniem do serwera
+            raw_password = self.account_conf["password"]
+            real_password = decrypt_password(raw_password)
+
+            conn.login(self.account_conf["login"], real_password)
             self._imap_conn = conn
             self._connected = True
-            print(f"{C('[OK]', 'green')} [AccountWorker {self.login_id}] Połączono i zalogowano do IMAP.")
+            print(f"{get_ts()} {C('[OK]', 'green')} [AccountWorker {self.login_id}] Połączono i zalogowano do IMAP.")
 
         except Exception as e:
             self._imap_conn = None
@@ -1437,19 +1667,23 @@ class AccountWorker(threading.Thread):
             raise
 
     def _disconnect_imap(self):
+        # [FAST EXIT]
+        if not self._global_running_event.is_set():
+             return
+
         if self._imap_conn:
             try:
                 self._imap_conn.logout()
             except Exception as e:
-                print(f"{C('[WARN]', 'yellow')} [AccountWorker {self.login_id}] Błąd podczas wylogowania: {e}", file=sys.stderr)
+                print(f"{get_ts()} {C('[WARN]', 'yellow')} [AccountWorker {self.login_id}] Błąd podczas wylogowania: {e}", file=sys.stderr)
             finally:
                 self._imap_conn = None
                 self._connected = False
-                print(f"{C('[INFO]', 'cyan')} [AccountWorker {self.login_id}] Rozłączono z IMAP.")
+                print(f"{get_ts()} {C('[INFO]', 'cyan')} [AccountWorker {self.login_id}] Rozłączono z IMAP.")
 
     def stop(self):
         self._stop_event.set()
-        print(f"{C(f'[AccountWorker {self.login_id}]', 'purple')} Sygnalizuję zatrzymanie wątku.")
+        print(f"{get_ts()} {C(f'[AccountWorker {self.login_id}]', 'purple')} Sygnalizuję zatrzymanie wątku.")
 
 # ===============================================================
 #                                   MAIN (WERSJA POPRAWIONA)
@@ -1511,14 +1745,9 @@ def manage_workers(current_workers, enabled_accounts_config, global_config, inte
 
 
 if __name__ == "__main__":
-    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-    BASE_DIR = os.path.dirname(SCRIPT_DIR)
-    DEFAULT_CONFIG_PATH = os.path.join(BASE_DIR, 'config', 'config.json')
-    SELECTOR_FILE_PATH = os.path.join(BASE_DIR, 'config', 'active_account_selector')
-
     parser = argparse.ArgumentParser(description="Mail fetcher for Conky Lua (UID batch-fetch + GeoIP + diagnostyka + threading pooling)")
     parser.add_argument("--config", default=DEFAULT_CONFIG_PATH, help=f"Ścieżka do pliku konfiguracyjnego (domyślnie: {DEFAULT_CONFIG_PATH})")
-    parser.add_argument("--max-mails", type=int, default=20, help="Ilość maili do pobrania (domyślnie 20)")
+    parser.add_argument("--max-mails", type=int, default=50, help="Ilość maili do pobrania (domyślnie 20)")
     parser.add_argument("--show-all", action="store_true", help="Pokaż wszystkie maile, nie tylko nieprzeczytane")
     parser.add_argument("--preview-lines", default="auto", help="Ile linii w podglądzie maila (liczba lub 'auto')")
     parser.add_argument("--output", help="Zapisz wynik do pliku (dodatkowo, obok cache)")
@@ -1566,6 +1795,10 @@ if __name__ == "__main__":
     internet_monitor = InternetMonitor(GLOBAL_RUNNING_EVENT)
     internet_monitor.start()
 
+    # --- Start GeoIP Worker ---
+    geoip_worker = GeoIPWorker(GLOBAL_RUNNING_EVENT, args.geoip_cache)
+    geoip_worker.start()
+
     workers = []
 
     def graceful_shutdown(signum, frame):
@@ -1589,6 +1822,9 @@ if __name__ == "__main__":
     # Ta zmienna będzie przechowywać ostatnio zapisaną wersję danych.
     # Użyjemy jej do porównania, czy dane faktycznie się zmieniły.
     last_written_data = None
+    
+    # [NOWOŚĆ] Śledzenie, kiedy ostatnio zapisaliśmy dane ze względu na update GeoIP
+    last_geoip_update_seen = 0.0
     # =========================================================================
     # === ZMIANA: OPTYMALIZACJA ZAPISU (KONIEC) ===
     # =========================================================================
@@ -1710,6 +1946,26 @@ if __name__ == "__main__":
                     # <<< KONIEC KLUCZOWEJ ZMIANY >>>                                   #
                     # ================================================================= #
 
+                # ================================================================= #
+                # <<< GEOIP ENRICHMENT PASS (Niezbędny przy Async Queue) >>>        #
+                # Uzupełniamy dane w locie, bo AccountWorker tylko zlecił zadanie.  #
+                # ================================================================= #
+                if 'mails' in final_output_data:
+                    with _geoip_cache_lock:
+                         for mail in final_output_data['mails']:
+                             meta = mail.get('meta', {})
+                             ip = meta.get('ip')
+                             # Jeśli pole kraju puste, a mamy to w cache -> uzupełniamy
+                             if ip and not meta.get('country') and ip in _geoip_cache_mem:
+                                 cached = _geoip_cache_mem[ip]
+                                 meta['ip_city'] = cached.get('city', "")
+                                 meta['isp'] = cached.get('isp', "")
+                                 meta['country'] = cached.get('country', "")
+                                 meta['country_code'] = cached.get('country_code', "")
+                                 meta['mobile'] = cached.get('mobile', False)
+
+                # Tutaj powinna być linia: last_seen_uids = load_last_seen()
+
                 last_seen_uids = load_last_seen()
                 current_uids_in_output = set()
                 if 'mails' in final_output_data:
@@ -1725,13 +1981,18 @@ if __name__ == "__main__":
                 # === ZMIANA: OPTYMALIZACJA ZAPISU (START) ===
                 # =========================================================================
                 # Sprawdzamy, czy nowo zagregowane dane dla mail_cache.json się zmieniły.
-                if final_output_data != last_written_data:
+                # LUB czy zmienił się znacznik czasu aktualizacji GeoIP.
+                
+                geoip_updated = (last_geoip_update_seen < _geoip_last_update_ts)
+                
+                if (final_output_data != last_written_data) or geoip_updated:
                     if internet_monitor.online:
                         safe_write_json(final_output_data, args.cache)
                         # Po udanym zapisie, aktualizujemy stan w pamięci.
                         last_written_data = final_output_data
+                        last_geoip_update_seen = _geoip_last_update_ts
                         # Możesz odkomentować poniższą linię, aby widzieć w logach, kiedy zapis faktycznie następuje
-                        # print(f"{C('[CACHE]', 'dim')} Zapisano zmiany w mail_cache.json")
+                        # print(f"{C('[CACHE]', 'dim')} Zapisano zmiany w mail_cache.json (GeoIP update: {geoip_updated})")
 
                 # <<< NOWA ZMIANA: Osobna, warunkowa logika zapisu dla last_seen_mails.json >>>
                 # Porównujemy zbiór UID-ów z pliku ze zbiorem nowo wygenerowanym.
@@ -1753,12 +2014,10 @@ if __name__ == "__main__":
     except Exception as main_error:
         print(f"{C('[CRITICAL ERROR]', 'red', 'bold')} Niespodziewany błąd w głównej pętli: {main_error}", file=sys.stderr)
     finally:
-        print(f"{C('[MAIN]', 'blue', 'bold')} Oczekiwanie na zakończenie wątków...")
+        print(f"{C('[MAIN]', 'blue', 'bold')} Zamykanie programu...")
         GLOBAL_RUNNING_EVENT.clear()
         
-        active_workers = [w for w in workers if w.is_alive()]
-        for worker in active_workers:
-            worker.join(timeout=global_worker_config.get("polling_interval", 60) + 5)
-        
-        internet_monitor.join(timeout=NETWORK_MONITOR_INTERVAL + 5)
-        print(f"{C('[MAIN]', 'green', 'bold')} Program zakończył działanie.")
+        # [FAST EXIT] Nie czekamy na join(). Skoro wątki są daemonami, 
+        # zakończenie MAIN automatycznie je ubije.
+        print(f"{C('[MAIN]', 'green', 'bold')} Program zakończył działanie (FAST EXIT).")
+        os._exit(0)

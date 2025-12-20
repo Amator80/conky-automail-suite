@@ -1,0 +1,9 @@
+[DEBUG] 2025-11-20 10:35:51 - Rozpoczęcie głównej pętli
+[DEBUG] 2025-11-20 10:35:51 - Liczba kont w konfiguracji: 5
+[DEBUG] 2025-11-20 10:35:54 - Wybrana opcja: EXIT_CODE=5, CHOICE_AND_SELECTION=
+[DEBUG] 2025-11-20 10:35:54 - Funkcja move_account: rozpoczęcie, selection_ids=, direction=up
+[DEBUG] 2025-11-20 10:35:54 - Liczba zaznaczonych kont do przesunięcia: 0
+[DEBUG] 2025-11-20 10:35:55 - Rozpoczęcie głównej pętli
+[DEBUG] 2025-11-20 10:35:55 - Liczba kont w konfiguracji: 5
+[DEBUG] 2025-11-20 10:35:58 - Wybrana opcja: EXIT_CODE=1, CHOICE_AND_SELECTION=
+[DEBUG] 2025-11-20 10:35:59 - Zakończenie działania skryptu

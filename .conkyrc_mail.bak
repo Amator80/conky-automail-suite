@@ -1,14 +1,3 @@
--- ============================================================
--- AUTO-DETEKCJA ŚCIEŻKI (PORTABLE MODE)
--- ============================================================
--- 1. Pobieramy ścieżkę do katalogu, w którym leży ten plik .conf
---    (zakładamy, że jest to główny katalog projektu)
-local project_root = debug.getinfo(1, "S").source:match("@(.*/)") or "./"
-
--- 2. Budujemy pełną ścieżkę do skryptu Lua w podkatalogu 'lua/'
-local lua_script_path = project_root .. "lua/e-mail.lua"
--- ============================================================
-
 conky.config = {
     -- OGÓLNE I OKNO
     background              = true,
@@ -68,11 +57,8 @@ conky.config = {
     if_up_strictness        = 'address',
 
     -- LUA
-    -- Tutaj używamy naszej dynamicznej ścieżki:
-    lua_load = lua_script_path,
-    
-    -- Nazwa funkcji musi być zgodna z tą w pliku e-mail.lua (conky_draw_mail_indicator)
-    lua_draw_hook_post = 'conky_draw_mail_indicator',
+    lua_load = '/home/linux/conky-automail-suite/lua/e-mail.lua',
+    lua_draw_hook_post = 'draw_mail_indicator',
 };
 
 conky.text = [[
