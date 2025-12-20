@@ -33,7 +33,7 @@ Wersja **2.0.0** wprowadza przełomowe zmiany: pełne szyfrowanie haseł (Securi
 ## Co nowego w v2.0.0?
 * **Szyfrowanie Haseł:** Koniec z trzymaniem haseł otwartym tekstem. System wykorzystuje OpenSSL i unikalny klucz użytkownika do szyfrowania danych logowania.
 * **System Awatarów:** Widżet wyświetla zdjęcia profilowe nadawców. Możesz zarządzać nimi przez dedykowany `Avatar_Manager.sh`.
-* **Asynchroniczność:** Pobieranie danych GeoIP (flagi, kraje) odbywa się teraz w tle, nie blokując startu widżetu.
+* **Asynchroniczność:** Pobieranie danych GeoIP (adres IP, kraj, miasto, dostawca ISP itp...) odbywa się teraz w tle, nie blokując startu widżetu.
 * **Zintegrowany Watchdog:** Nowy skrypt startowy sam pilnuje stabilności Conky i zużycia RAM – usunięto zbędne, zewnętrzne procesy.
 * **Automatyzacja:** Skrypty Lua same wykrywają ścieżki, eliminując potrzebę ręcznej edycji plików po instalacji lub przeniesieniu folderu.
 
@@ -134,7 +134,7 @@ System v2.0.0 pozwala na wyświetlanie zdjęć znajomych lub logotypów sklepów
 2. Kliknij **"DODAJ NOWY"**.
 3. Wpisz adres e-mail nadawcy (np. `powiadomienia@allegro.pl`).
 4. Wybierz kategorię (Znajomi / Inne).
-5. Wskaż plik graficzny (PNG/JPG).
+5. Wskaż plik graficzny (PNG).
 6. Gotowe! Przy następnym mailu od tego nadawcy zobaczysz jego awatar.
 
 > **Wskazówka:** Możesz dostosować rozmiar, kształt (koło/kwadrat) i ramkę awatarów w opcjach Menedżera Awatarów (przycisk "Ustawienia Wyglądu").
