@@ -1,5 +1,4 @@
-# Conky AutoMail Suite v2.0.0 – Security & Avatar Edition
-
+# Conky AutoMail Suite v2.0.0
 ![Licencja: GPL v3](https://img.shields.io/badge/Licencja-GPL_v3-blue.svg)
 ![Wersja: 2.0.0](https://img.shields.io/badge/Wersja-2.0.0-brightgreen)
 ![Utrzymywany?: Tak](https://img.shields.io/badge/Utrzymywany%3F-Tak-green.svg)
