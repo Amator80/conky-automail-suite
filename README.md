@@ -13,7 +13,7 @@ Wersja **2.x.x** wprowadza przełomowe zmiany: pełne szyfrowanie haseł (Securi
 ---
 
 ### Spis Treści
-1. [Co nowego w v2.x.x?](#co-nowego-w-v200)
+1. [Co nowego w v2.x.x?](#co-nowego-w-v2xx)
 2. [O Projekcie](#o-projekcie)
 3. [Główne Filary Projektu](#główne-filary-projektu)
 4. [Kluczowe Funkcje](#kluczowe-funkcje)
