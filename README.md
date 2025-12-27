@@ -1,6 +1,6 @@
-# Conky AutoMail Suite v2.0.0
+# Conky AutoMail Suite v2.x.x
 ![Licencja: GPL v3](https://img.shields.io/badge/Licencja-GPL_v3-blue.svg)
-![Wersja: 2.0.0](https://img.shields.io/badge/Wersja-2.0.0-brightgreen)
+![Wersja: 2.x.x](https://img.shields.io/badge/Wersja-2.x.x-brightgreen)
 ![Utrzymywany?: Tak](https://img.shields.io/badge/Utrzymywany%3F-Tak-green.svg)
 ![Platforma: Linux](https://img.shields.io/badge/Platforma-Linux-lightgrey.svg?logo=linux)
 
@@ -8,12 +8,12 @@
 
 **Conky AutoMail Suite** to nie tylko widżet, ale kompletny, modułowy system do monitorowania poczty e-mail w środowisku Conky na Linuksie. Dzięki zaawansowanej architekturze z demonem w Pythonie, graficznym narzędziom konfiguracyjnym i potężnym możliwościom personalizacji w Lua, projekt zapewnia niezrównaną wydajność, stabilność i wygodę użytkowania.
 
-Wersja **2.0.0** wprowadza przełomowe zmiany: pełne szyfrowanie haseł (Security Pro), system awatarów nadawców oraz asynchroniczne przetwarzanie danych.
+Wersja **2.x.x** wprowadza przełomowe zmiany: pełne szyfrowanie haseł (Security Pro), system awatarów nadawców oraz asynchroniczne przetwarzanie danych.
 
 ---
 
 ### Spis Treści
-1. [Co nowego w v2.0.0?](#co-nowego-w-v200)
+1. [Co nowego w v2.x.x?](#co-nowego-w-v200)
 2. [O Projekcie](#o-projekcie)
 3. [Główne Filary Projektu](#główne-filary-projektu)
 4. [Kluczowe Funkcje](#kluczowe-funkcje)
@@ -30,7 +30,7 @@ Wersja **2.0.0** wprowadza przełomowe zmiany: pełne szyfrowanie haseł (Securi
 
 ---
 
-## Co nowego w v2.0.0?
+## Co nowego w v2.x.x?
 * **Szyfrowanie Haseł:** Koniec z trzymaniem haseł otwartym tekstem. System wykorzystuje OpenSSL i unikalny klucz użytkownika do szyfrowania danych logowania.
 * **System Awatarów:** Widżet wyświetla zdjęcia profilowe nadawców. Możesz zarządzać nimi przez dedykowany `Avatar_Manager.sh`.
 * **Asynchroniczność:** Pobieranie danych GeoIP (adres IP, kraj, miasto, dostawca ISP itp...) odbywa się teraz w tle, nie blokując startu widżetu.
@@ -89,7 +89,7 @@ W tej wersji bezpieczeństwo Twoich danych jest priorytetem:
 | `1.Instalacja_zależności_v2.sh` | **Instalator.** Automatycznie wykrywa dystrybucję i instaluje wszystkie wymagane pakiety. |
 | `2.menager_kont.sh` | **Menedżer kont.** Główne centrum dowodzenia. Zarządza kontami, szyfruje hasła, obsługuje Master Password. |
 | `3.START_skryptów_oraz_conky.sh` | **Skrypt startowy.** Uruchamia demona Pythona, Conky i wbudowanego Watchdoga. Monitoruje zużycie RAM. |
-| `Avatar_Manager.sh` | **Menedżer awatarów.** Nowość w v2.0.0. Narzędzie do przypisywania obrazków do adresów e-mail. |
+| `Avatar_Manager.sh` | **Menedżer awatarów.** Nowość w v2.x.x. Narzędzie do przypisywania obrazków do adresów e-mail. |
 | `Konfiguracja_pozycji...sh` | **Konfigurator wyglądu.** Graficzne narzędzie do zmiany pozycji, układu i rozmiaru widżetu. |
 | `zarzadzaj-pocztą.sh` | **Menedżer poczty.** Graficzne narzędzie do wykonywania zbiorczych akcji na wiadomościach (np. "oznacz wszystkie jako przeczytane"). |
 
@@ -128,7 +128,7 @@ Dzięki automatyzacji, proces instalacji skrócił się do 3 kroków:
     *Ten skrypt uruchomi w tle demona Pythona oraz wbudowany watchdog dla Conky.*
 
 ## Awatary - Konfiguracja
-System v2.0.0 pozwala na wyświetlanie zdjęć znajomych lub logotypów sklepów.
+System v2.x.x pozwala na wyświetlanie zdjęć znajomych lub logotypów sklepów.
 
 1. Uruchom `Avatar_Manager.sh`.
 2. Kliknij **"DODAJ NOWY"**.
@@ -174,7 +174,7 @@ Jeśli problem występuje sporadycznie, sprawdź plik `log/mail_diag.json`. Zawi
       bash 3.START_skryptów_oraz_conky.sh --debug
       ```
 * **Q: Zniknął skrypt 2.Podmiana...?**
-    * A: Tak, w wersji 2.0.0 jest on niepotrzebny. Nowy kod Lua jest inteligentny i sam wykrywa ścieżki do plików, niezależnie od tego, gdzie rozpakujesz projekt.
+    * A: Tak, w wersji 2.x.x jest on niepotrzebny. Nowy kod Lua jest inteligentny i sam wykrywa ścieżki do plików, niezależnie od tego, gdzie rozpakujesz projekt.
 * **Q: Jak zresetować wszystko (zapomniałem Hasła Głównego)?**
     * A: Ze względów bezpieczeństwa hasła nie da się odzyskać. Musisz zresetować konfigurację:
         1. Usuń plik `config/config.json`.
@@ -184,14 +184,28 @@ Jeśli problem występuje sporadycznie, sprawdź plik `log/mail_diag.json`. Zawi
     * A: Większość dużych dostawców wymaga wygenerowania tzw. **Hasła do aplikacji** (App Password) dla zewnętrznych klientów IMAP. Zaloguj się przez przeglądarkę do ustawień bezpieczeństwa swojego konta e-mail, wygeneruj nowe hasło aplikacji i użyj go w Menedżerze Kont zamiast swojego głównego hasła.
 
 ## Kompatybilność
-Skrypt instalacyjny został zaprojektowany z myślą o szerokiej kompatybilności i był testowany na następujących systemach:
-* **Rodzina Debian/Ubuntu**: Ubuntu 22.04+, Debian 11/12+, Linux Mint 21+
-* **Rodzina Arch Linux**: Arch Linux, Manjaro, Garuda Linux, EndeavourOS, Artix Linux
-* **Rodzina Fedora/Red Hat**: Fedora 38+
-* **Inne**: openSUSE, Solus
+Skrypt instalacyjny (v2.0) został znacznie rozbudowany i posiada dedykowane reguły dla szerokiego spektrum dystrybucji Linuksa. Automatycznie wykrywa system, dobiera odpowiednie wersje bibliotek (Lua 5.3/5.4) i zarządza repozytoriami.
 
-Projekt powinien działać na większości nowoczesnych dystrybucji Linuksa, które korzystają z menedżerów pakietów `apt`, `dnf`, `pacman`, `zypper` lub `eopkg`.
+**Pełne wsparcie automatyczne:**
+*   **Rodzina Debian/Ubuntu (`apt`)**:
+    *   Ubuntu 22.04, 24.04+
+    *   Linux Mint 21, 22+
+    *   Debian 11 (Bullseye), 12 (Bookworm), 13 (Trixie)
+*   **Rodzina Arch Linux (`pacman`)**:
+    *   Arch Linux, Manjaro, Garuda Linux, EndeavourOS, Artix Linux
+*   **Rodzina RPM (`dnf`, `zypper`)**:
+    *   **Fedora**: 38+
+    *   **OpenMandriva**: Lx 5.0, Rome (Rolling) & Rock (z automatyczną obsługą repozytoriów dla pakietu `conky`)
+    *   **Mageia**: 9+
+    *   **openSUSE**: Tumbleweed oraz Leap
+*   **Inne**:
+    *   Solus (`eopkg`)
 
+**Wsparcie asystowane (tryb interaktywny):**
+*   **Gentoo**: Skrypt wykrywa system i instruuje użytkownika, jakie flagi USE i pakiety zainstalować (`emerge`), oczekując na wykonanie poleceń.
+*   **NixOS**: Wyświetla instrukcje dotyczące edycji `configuration.nix`.
+
+Projekt działa na większości środowisk graficznych (wymaga `bash`, `zenity` oraz `yad` – skrypt potrafi je doinstalować automatycznie na wspieranych systemach).
 ## Autorzy i Licencja
 
 ### Autorzy projektu
