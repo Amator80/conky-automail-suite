@@ -1,5 +1,5 @@
 #!/bin/bash
-# 1.Instalacja_zależności.sh (v1.9 - No VENV Mod + System Fixes)
+# 1.Instalacja_zależności_v2.sh (v2.0 - Merged: No VENV + System Fixes + YAD)
 
 # ==========================================
 # 1. KONFIGURACJA ZMIENNYCH
@@ -15,6 +15,7 @@ START_SOUND="$SOUND_FOLDER/start_notification_1.wav"
 play_start_sound() {
   if [[ -f "$START_SOUND" ]]; then
     if command -v paplay &> /dev/null; then
+      # Poprawka: ukrycie błędów connection refused
       paplay "$START_SOUND" >/dev/null 2>&1 & 
     elif command -v aplay &> /dev/null; then
       aplay -q "$START_SOUND" >/dev/null 2>&1 &
@@ -71,9 +72,9 @@ open_in_terminal_async() {
     fi
     case "$TERM_CMD" in
         gnome-terminal)       gnome-terminal --wait -- bash -lc "$CMD$HOLD_TAIL" & ;;
-        # POPRAWKA: dodano --disable-server dla XFCE
+        # POPRAWKA OD KOLEGI: dodano --disable-server dla XFCE
         xfce4-terminal)       xfce4-terminal --disable-server --command "bash -lc \"$CMD$HOLD_TAIL\"" & ;;
-        # POPRAWKA: dodano --nofork dla Konsole
+        # POPRAWKA OD KOLEGI: dodano --nofork dla Konsole
         konsole)              konsole --nofork -e bash -lc "$CMD$HOLD_TAIL" & ;;
         tilix)                tilix -- bash -lc "$CMD$HOLD_TAIL" & ;;
         mate-terminal)        mate-terminal --disable-factory -- bash -lc "$CMD$HOLD_TAIL" & ;;
@@ -104,8 +105,11 @@ is_pkg_installed() {
         return 1
     fi
 
-    if command -v "${pkg%%-*}" &>/dev/null; then
-        return 0
+    # Poprawka: ignorujemy sprawdzenie command -v dla python-ensurepip (jeśli występuje)
+    if [[ "$pkg" != "python-ensurepip" ]]; then
+        if command -v "${pkg%%-*}" &>/dev/null; then
+            return 0
+        fi
     fi
 
     case "$PM" in
@@ -170,6 +174,7 @@ if ! command -v zenity &>/dev/null; then
             exit 1
             ;;
 gentoo*)
+            # POPRAWKA OD KOLEGI: Lepsza pętla dla Gentoo
             RUN_GENTOO='
                 FIRST_RUN=1
                 while ! command -v zenity &>/dev/null; do
@@ -328,6 +333,7 @@ if ! command -v notify-send &>/dev/null; then
         mageia*)                                  PKG_NOTIFY="libnotify";       INSTALL_NOTIFY="su -c 'dnf install -y libnotify'" ;;
         nixos) error_exit "Na NixOS zainstaluj notify-send przez configuration.nix" "notify-send" ;;
         gentoo*)
+            # POPRAWKA OD KOLEGI: Dedykowana pętla dla Gentoo dla notify-send
             RUN_GENTOO_NOTIFY='
                 FIRST_RUN=1
                 while ! command -v notify-send &>/dev/null; do
@@ -403,7 +409,7 @@ fi
 
 
 # ==========================================
-# 7. KONFIGURACJA MENEDŻERA PAKIETÓW (NO VENV MOD)
+# 7. KONFIGURACJA MENEDŻERA PAKIETÓW (MOD Z DODANYM YAD + NO VENV)
 # ==========================================
 
 UNKNOWN_PM=0
@@ -412,15 +418,17 @@ case "$DISTRO" in
   linuxmint|"linux mint"|mint)
     PM="apt-get"; INSTALL="sudo $PM install -y"; PREINSTALL_CMD="sudo apt-get update"
     MAJOR_VER=$(echo "$VERSION" | cut -d. -f1 | tr -d '[:space:]')
+    # Dodano yad do list
     if [[ "$MAJOR_VER" == "21" || "$MAJOR_VER" == "22" ]]; then
-      REQUIRED_PACKAGES=(conky-all wget lua5.4 liblua5.4-dev jq fonts-noto-color-emoji)
+      REQUIRED_PACKAGES=(conky-all wget lua5.4 liblua5.4-dev jq fonts-noto-color-emoji yad)
     else
-      REQUIRED_PACKAGES=(conky-all wget lua5.3 liblua5.3-dev jq fonts-noto-color-emoji)
+      REQUIRED_PACKAGES=(conky-all wget lua5.3 liblua5.3-dev jq fonts-noto-color-emoji yad)
     fi
     ;;
   ubuntu)
     PM="apt-get"; INSTALL="sudo $PM install -y"; PREINSTALL_CMD="sudo apt-get update"
-    REQUIRED_PACKAGES=(conky-all wget jq fonts-noto-color-emoji)
+    # Dodano yad
+    REQUIRED_PACKAGES=(conky-all wget jq fonts-noto-color-emoji yad)
     if [[ "$VERSION" =~ ^22(\.|$) || "$VERSION" =~ ^24(\.|$) ]]; then
       REQUIRED_PACKAGES+=(lua5.4 liblua5.4-dev)
     else
@@ -429,7 +437,8 @@ case "$DISTRO" in
     ;;
   debian)
     PM="apt-get"; INSTALL="sudo $PM install -y"; PREINSTALL_CMD="sudo apt-get update"
-    REQUIRED_PACKAGES=(conky-all wget jq fonts-noto-color-emoji)
+    # Dodano yad
+    REQUIRED_PACKAGES=(conky-all wget jq fonts-noto-color-emoji yad)
     if [[ "$VERSION" =~ ^(11|12|13)(\.|$) ]]; then
       REQUIRED_PACKAGES+=(lua5.4 liblua5.4-dev)
     else
@@ -439,20 +448,79 @@ case "$DISTRO" in
   fedora)
     PM="dnf"; INSTALL="sudo $PM install -y"; PREINSTALL_CMD="sudo dnf makecache"
     if dnf list texlive-noto-emoji &>/dev/null; then EMOJI_PKG="texlive-noto-emoji"; else EMOJI_PKG="google-noto-emoji-color-fonts"; fi
-    REQUIRED_PACKAGES=(conky wget lua lua-devel jq "$EMOJI_PKG")
+    # Dodano yad
+    REQUIRED_PACKAGES=(conky wget lua lua-devel jq "$EMOJI_PKG" yad)
     ;;
   openmandriva*)
-    trap - ERR
-    zenity --question \
-        --width=550 --title="Ostrzeżenie OpenMandriva Lx" \
-        --text="⚠️ <big><b>Wykryto system OpenMandriva.</b></big>\n\nObecne wersje pakietu <b>conky</b> w oficjalnych repozytoriach stabilnych (Rome/Rock) są uszkodzone (brak obsługi Cairo/Lua).\n\nAby widget działał poprawnie, instalator spróbuje pobrać pakiet <tt>conky</tt> z repozytorium eksperymentalnego <b>cooker</b>.\n\nCzy zgadzasz się na instalację pakietu z repozytorium Cooker?" \
-        --ok-label="Tak, zgadzam się" --cancel-label="Anuluj" --icon-name="dialog-warning"
-    if [ $? -ne 0 ]; then zenity_info_or_exit "❗ <b>Przerwano instalację.</b>\nUżytkownik nie wyraził zgody na instalację z repo Cooker." 400; exit 0; fi
-    trap 'error_exit "Nieoczekiwany błąd w skrypcie!" "trap"' ERR
-    PM="dnf"; INSTALL="sudo $PM install -y"
-    PREINSTALL_CMD="if ! rpm -q conky &>/dev/null; then echo 'Instalacja conky z repo cooker...'; sudo dnf install -y conky --enablerepo=cooker-x86_64,cooker-x86_64-extra; fi; sudo dnf makecache"
-    # USUNIĘTO python-ensurepip z listy (NO VENV)
-    REQUIRED_PACKAGES=(conky wget lua jq zenity-gtk fonts-ttf-noto-emoji)
+    # --- POPRAWKA OD KOLEGI: Lepsze wykrywanie OpenMandriva (Rome vs Rock) ---
+    OM_CODENAME=$(lsb_release -cs 2>/dev/null | tr '[:upper:]' '[:lower:]')
+    
+    # === WARIANT 1: OpenMandriva ROME (Rolling) ===
+    if [[ "$OM_CODENAME" == "rome" ]] || [[ "$OM_CODENAME" == "rolling" ]]; then
+        PM="dnf"
+        PREINSTALL_CMD="sudo dnf clean all; sudo dnf makecache"
+        # Dodano yad, usunięto python-ensurepip (bo NO VENV)
+        REQUIRED_PACKAGES=(conky wget lua jq zenity-gtk fonts-ttf-noto-emoji yad)
+        
+        if rpm -q conky &>/dev/null; then
+            INSTALL="sudo $PM install -y"
+        else
+            REPO_ACTIVE=0
+            IS_RETRY=0 
+            while [ $REPO_ACTIVE -eq 0 ]; do
+                if dnf repolist | grep -q "rolling-x86_64-extra"; then
+                    REPO_ACTIVE=1
+                    INSTALL="sudo $PM install -y"
+                    break
+                fi
+                if [ $IS_RETRY -eq 0 ]; then
+                    HEADER_MSG="ℹ️ <big><b>Wymagane repozytorium 'Extra' jest wyłączone.</b></big>"
+                else
+                    HEADER_MSG="<span foreground='red'>⛔ <big><big><b>Wymagane repozytorium 'Extra' jest NADAL wyłączone!</b></big></big></span>"
+                fi
+                FULL_TEXT="${HEADER_MSG}\n\nPakiet <b>conky</b> znajduje się w repozytorium <tt>rolling-x86_64-extra</tt>.\nAby otrzymywać aktualizacje, zaleca się włączenie go w ustawieniach systemu.\n\nCo chcesz zrobić?"
+                trap - ERR
+                USER_ACTION=$(zenity --question \
+                    --width=700 --title="Konfiguracja OpenMandriva Rolling" \
+                    --text="$FULL_TEXT" \
+                    --ok-label="Wszystko OK / Sprawdź ponownie" \
+                    --cancel-label="Anuluj" \
+                    --extra-button="Otwórz Software Repository Selector" \
+                    --extra-button="Instalacja tymczasowa (Awaryjna)" \
+                    --icon-name="dialog-information")
+                RET_CODE=$?
+                trap 'error_exit "Nieoczekiwany błąd w skrypcie!" "trap"' ERR
+                if [ "$USER_ACTION" == "Otwórz Software Repository Selector" ]; then
+                    trap - ERR; om-repo-picker; trap 'error_exit "Nieoczekiwany błąd w skrypcie!" "trap"' ERR
+                    (zenity --info --width=400 --timeout=3 --text="🔄 <b>Odświeżanie bazy pakietów...</b>" || true) &
+                    sudo dnf makecache &>/dev/null
+                    IS_RETRY=1
+                elif [ "$USER_ACTION" == "Instalacja tymczasowa (Awaryjna)" ]; then
+                    INSTALL="sudo $PM install -y --enablerepo=rolling-x86_64-extra"
+                    REPO_ACTIVE=1; break
+                elif [ $RET_CODE -eq 0 ]; then
+                    (zenity --info --width=300 --timeout=2 --text="🔍 Weryfikacja..." || true) &
+                    sudo dnf makecache &>/dev/null
+                    IS_RETRY=1
+                else
+                    zenity_info_or_exit "⛔ <b>Przerwano instalację.</b>\n\nUżytkownik anulował wybór repozytorium." 400; exit 0
+                fi
+            done
+            if [ -z "$INSTALL" ]; then INSTALL="sudo $PM install -y"; fi
+        fi
+    # === WARIANT 2: OpenMandriva ROCK ===
+    else
+        trap - ERR
+        zenity --question \
+            --width=550 --title="Ostrzeżenie OpenMandriva Lx" \
+            --text="⚠️ <big><b>Wykryto system OpenMandriva.</b></big>\n\nObecne wersje pakietu <b>conky</b> w oficjalnych repozytoriach stabilnych (Rome/Rock) są uszkodzone (brak obsługi Cairo/Lua).\n\nAby widget działał poprawnie, instalator spróbuje pobrać pakiet <tt>conky</tt> z repozytorium eksperymentalnego <b>cooker/rolling</b>.\n\nCzy zgadzasz się na instalację pakietu z nowszego repozytorium?" \
+            --ok-label="Tak, zgadzam się" --cancel-label="Anuluj" --icon-name="dialog-warning"
+        if [ $? -ne 0 ]; then zenity_info_or_exit "❗ <b>Przerwano instalację.</b>\nUżytkownik nie wyraził zgody na instalację." 400; exit 0; fi
+        trap 'error_exit "Nieoczekiwany błąd w skrypcie!" "trap"' ERR
+        PM="dnf"; INSTALL="sudo $PM install -y"
+        PREINSTALL_CMD="if ! rpm -q conky &>/dev/null; then echo 'Instalacja conky z repo cooker...'; sudo dnf install -y conky --enablerepo=rolling-x86_64,rolling-x86_64-extra; fi; sudo dnf makecache"
+        REQUIRED_PACKAGES=(conky wget lua jq zenity-gtk fonts-ttf-noto-emoji yad)
+    fi
     ;;
   mageia*)
     PM="dnf"
@@ -461,24 +529,24 @@ case "$DISTRO" in
     else
         INSTALL="pkexec dnf install -y"; PREINSTALL_CMD="pkexec dnf makecache"
     fi
-    REQUIRED_PACKAGES=(conky wget lua jq zenity google-noto-emoji-color-fonts)
+    REQUIRED_PACKAGES=(conky wget lua jq zenity google-noto-emoji-color-fonts yad)
     ;;
   arch*|manjaro*|garuda*|endeavouros|artix)
     PM="pacman"; INSTALL="sudo $PM -S --noconfirm --needed"; PREINSTALL_CMD="sudo pacman -Sy"
-    REQUIRED_PACKAGES=(conky wget lua jq noto-fonts-emoji)
+    REQUIRED_PACKAGES=(conky wget lua jq noto-fonts-emoji yad)
     ;;
   opensuse*|suse*)
     PM="zypper"; INSTALL="sudo $PM install -y"; PREINSTALL_CMD="sudo zypper refresh"
     EMOJI_PKG="noto-coloremoji-fonts"
     if ! zypper se -x "$EMOJI_PKG" | grep -q "$EMOJI_PKG"; then EMOJI_PKG="google-noto-coloremoji-fonts"; fi
-    REQUIRED_PACKAGES=(conky wget lua jq "$EMOJI_PKG")
+    REQUIRED_PACKAGES=(conky wget lua jq "$EMOJI_PKG" yad)
     ;;
   solus)
     PM="eopkg"; INSTALL="sudo $PM install -y"; PREINSTALL_CMD="sudo eopkg update-repo"
-    REQUIRED_PACKAGES=(conky wget lua jq font-noto-emoji)
+    REQUIRED_PACKAGES=(conky wget lua jq font-noto-emoji yad)
     ;;
   nixos)
-    zenity_info_or_exit "ℹ️ <b>NixOS wykryty.</b>\nZainstaluj ręcznie pakiety: conky, lua, wget oraz noto-fonts-emoji przez configuration.nix." 520
+    zenity_info_or_exit "ℹ️ <b>NixOS wykryty.</b>\nZainstaluj ręcznie pakiety: conky, lua, wget, yad oraz noto-fonts-emoji przez configuration.nix." 520
     exit 0
     ;;
 gentoo)
@@ -486,31 +554,32 @@ gentoo)
     GENTOO_MODE=1
     # Atrapa
     REQUIRED_PACKAGES=("manual_action_required")
-    # Tekst dla Gentoo - BEZ VENV
-    MY_CUSTOM_TEXT="<b>app-admin/conky</b> - wymagane flagi USE: <b>lua-cairo</b>, <b>lua-cairo-xlib</b>, <b>bundled-toluapp</b> \n<b>dev-lang/lua</b>\n<b>net-misc/wget</b>\n<b>app-misc/jq</b>\n<b>media-fonts/noto-emoji</b> (lub inne, np. Google Fonts)"
+    # Tekst dla Gentoo - BEZ VENV, ALE Z YAD
+    MY_CUSTOM_TEXT="<b>app-admin/conky</b> - wymagane flagi USE: <b>lua-cairo</b>, <b>lua-cairo-xlib</b>, <b>bundled-toluapp</b> \n<b>dev-lang/lua</b>\n<b>net-misc/wget</b>\n<b>app-misc/jq</b>\n<b>gnome-extra/yad</b>\n<b>media-fonts/noto-emoji</b> (lub inne, np. Google Fonts)"
     ;;
   *)
     if command -v apt-get &>/dev/null; then
 	  PM="apt-get"; INSTALL="sudo $PM install -y"; PREINSTALL_CMD="sudo apt-get update"
-	  REQUIRED_PACKAGES=(conky-all wget jq fonts-noto-color-emoji)
+	  REQUIRED_PACKAGES=(conky-all wget jq fonts-noto-color-emoji yad)
       if apt-cache policy lua5.4 2>/dev/null | grep -q 'Candidate:[[:space:]]\+[0-9]'; then REQUIRED_PACKAGES+=(lua5.4 liblua5.4-dev); else REQUIRED_PACKAGES+=(lua5.3 liblua5.3-dev); fi
     elif command -v dnf &>/dev/null; then
       PM="dnf"; INSTALL="sudo $PM install -y"; PREINSTALL_CMD="sudo dnf makecache"
-      REQUIRED_PACKAGES=(conky wget lua lua-devel jq google-noto-emoji-color-fonts)
+      REQUIRED_PACKAGES=(conky wget lua lua-devel jq google-noto-emoji-color-fonts yad)
     elif command -v pacman &>/dev/null; then
       PM="pacman"; INSTALL="sudo $PM -S --noconfirm --needed"; PREINSTALL_CMD="sudo pacman -Sy"
-      REQUIRED_PACKAGES=(conky wget lua jq noto-fonts-emoji)
+      REQUIRED_PACKAGES=(conky wget lua jq noto-fonts-emoji yad)
     elif command -v zypper &>/dev/null; then
       PM="zypper"; INSTALL="sudo $PM install -y"; PREINSTALL_CMD="sudo zypper refresh"
       EMOJI_PKG="noto-coloremoji-fonts"
       if ! zypper se -x "$EMOJI_PKG" | grep -q "$EMOJI_PKG"; then EMOJI_PKG="google-noto-coloremoji-fonts"; fi
-      REQUIRED_PACKAGES=(conky wget lua jq "$EMOJI_PKG")
+      REQUIRED_PACKAGES=(conky wget lua jq "$EMOJI_PKG" yad)
     elif command -v eopkg &>/dev/null; then
       PM="eopkg"; INSTALL="sudo $PM install -y"; PREINSTALL_CMD="sudo eopkg update-repo"
-      REQUIRED_PACKAGES=(conky wget lua jq font-noto-emoji)
+      REQUIRED_PACKAGES=(conky wget lua jq font-noto-emoji yad)
     else
       UNKNOWN_PM=1
-      REQUIRED_PACKAGES=("<b>conky</b> (z obsługą cairo), <b>lua</b>, <b>wget</b>, <b>jq</b>, <b>fonts-noto-color-emoji</b> (lub podobny pakiet dostarczający kolorową czcionkę \"Color emoji font from Google\")")
+      # Lista dla nieznanego PM - dodano YAD
+      REQUIRED_PACKAGES=("<b>conky</b> (z obsługą cairo), <b>lua</b>, <b>wget</b>, <b>jq</b>, <b>yad</b>, <b>fonts-noto-color-emoji</b> (lub podobny pakiet dostarczający kolorową czcionkę \"Color emoji font from Google\")")
     fi
     ;;
 esac
@@ -551,7 +620,7 @@ manual_install_loop() {
             open_terminal_blank; sleep 0.3; continue
         elif [ "$RESP" = "Nie sprawdzaj zależności" ]; then
             trap - ERR
-            if zenity --question --width=550 --title="Potwierdzenie pominięcia" --text="<big>⚠️ <b>Czy na pewno chcesz pominąć sprawdzanie zależności?</b></big>\n\n<span foreground='red'>Pominięcie tego kroku oznacza, że skrypt nie zweryfikuje, czy wymagane pakiety (Conky, Lua, Wget itp.) są zainstalowane.</span>\n\nJeśli ich brakuje, widżet nie uruchomi się poprawnie lub wystąpią błędy.\n\nCzy jesteś świadomy ryzyka i chcesz kontynuować?"; then
+            if zenity --question --width=550 --title="Potwierdzenie pominięcia" --text="<big>⚠️ <b>Czy na pewno chcesz pominąć sprawdzanie zależności?</b></big>\n\n<span foreground='red'>Pominięcie tego kroku oznacza, że skrypt nie zweryfikuje, czy wymagane pakiety są zainstalowane.</span>\n\nJeśli ich brakuje, widżet nie uruchomi się poprawnie lub wystąpią błędy.\n\nCzy jesteś świadomy ryzyka i chcesz kontynuować?"; then
                 return 2
             else
                 trap 'error_exit "Nieoczekiwany błąd w skrypcie!" "trap"' ERR; continue
@@ -566,7 +635,7 @@ manual_install_loop() {
 
 if [ ${#MISSING_ON_START[@]} -ne 0 ]; then
     while :; do
-        # --- BLOK DLA NIEZNANEGO MENEDŻERA PAKIETÓW (POPRAWIONY) ---
+        # --- BLOK DLA NIEZNANEGO MENEDŻERA PAKIETÓW (POPRAWIONY OD KOLEGI) ---
         if [ "$UNKNOWN_PM" -eq 1 ]; then
             play_start_sound
             trap - ERR
@@ -586,7 +655,6 @@ if [ ${#MISSING_ON_START[@]} -ne 0 ]; then
                 fi
             fi
             
-            # ZMODYFIKOWANY TEKST - BEZ VENV
             zenity --question \
                 --width=900 \
                 --title="$TITLE_TEXT" \
@@ -688,6 +756,7 @@ fi
 # 9. DETEKCJA WSPARCIA LUA W CONKY
 # ==========================================
 
+# POPRAWKA OD KOLEGI: Ulepszona detekcja ldd
 CONKY_VER="$(conky -v 2>/dev/null || true)"
 HAS_LUA_IN_CONKY="no"
 CONKY_LUA="brak"
@@ -769,6 +838,7 @@ trap 'error_exit "Nieoczekiwany błąd w skrypcie!" "trap"' ERR
 # 10. DKJSON
 # ==========================================
 
+# POPRAWKA OD KOLEGI: Sprawdzanie internetu przed pobraniem
 check_internet() {
     if command -v curl &>/dev/null; then
         curl -I --connect-timeout 3 --max-time 5 https://raw.githubusercontent.com/ 1>/dev/null 2>&1
@@ -790,6 +860,7 @@ else
 fi
 
 if zenity --question --title="Sukces! 🎉" --text="<big><big>Skrypt wykonał swoje zadanie 😊</big></big>\nCzy chcesz teraz uruchomić kolejny skrypt <b>\"2.menager_kont.sh\"</b>, który pomoże Ci skonfigurować konta pocztowe?\n<span foreground='red'>Jest to konieczne do prawidłowego działania widgetu.</span>" --ok-label="Tak" --cancel-label="Nie"; then
+    # ZACHOWANO TWOJĄ NAZWĘ PLIKU: 2.menager_kont.sh
     if [ -f "$SCRIPT_DIR/2.menager_kont.sh" ]; then
         bash "$SCRIPT_DIR/2.menager_kont.sh" &
         exit 0

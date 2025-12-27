@@ -43,6 +43,7 @@ fi
 if [ ! -f "$CONFIG_PATH" ] || [ ! -s "$CONFIG_PATH" ]; then
     mkdir -p "$(dirname "$CONFIG_PATH")"
     echo '{"master_hash": null, "accounts": []}' > "$CONFIG_PATH"
+    echo "0" > "$SELECTOR_FILE"
 else
     # Sprawdzamy składnię JSON
     JQ_OUTPUT=$(jq empty "$CONFIG_PATH" 2>&1)
@@ -61,6 +62,7 @@ else
             mkdir -p "$(dirname "$CONFIG_PATH")"
             echo '{"master_hash": null, "accounts": []}' > "$CONFIG_PATH"
             rm -f "$ATTEMPT_FILE"
+            echo "0" > "$SELECTOR_FILE"
             yad --info --center --text="Plik konfiguracyjny został zresetowany do ustawień fabrycznych."
         else
             exit 1
@@ -289,6 +291,7 @@ verify_access() {
         
         echo '{"master_hash": null, "accounts": []}' > "$CONFIG_PATH"
         rm -f "$ATTEMPT_FILE"
+        echo "0" > "$SELECTOR_FILE"
         verify_access
         return $?
     fi
@@ -343,6 +346,7 @@ verify_access() {
             
             echo '{"master_hash": null, "accounts": []}' > "$CONFIG_PATH"
             rm -f "$ATTEMPT_FILE"
+            echo "0" > "$SELECTOR_FILE"
             verify_access
             return $?
         fi
@@ -369,6 +373,7 @@ verify_access() {
                 
                 echo '{"master_hash": null, "accounts": []}' > "$CONFIG_PATH"
                 rm -f "$ATTEMPT_FILE"
+                echo "0" > "$SELECTOR_FILE"
                 yad --info --center --text="Dane zostały wyczyszczone."
                 verify_access
                 return $?

@@ -1,11 +1,13 @@
 {
-  "DEFAULT_PROFILE": "/home/linux/.git_projekt_mail/conky-automail-suite/avatar/DEFAULT/Default_2.png|Default",
-  "transaction@notice.aliexpress.com": "/home/linux/.git_projekt_mail/conky-automail-suite/avatar/inne-sklepy/Aliexpress.png|Inne/Sklepy",
-  "hello@newsletter.allegro.pl": "/home/linux/.git_projekt_mail/conky-automail-suite/avatar/inne-sklepy/allegro.png|Inne/Sklepy",
-  "info@paczkomaty.pl": "/home/linux/.git_projekt_mail/conky-automail-suite/avatar/inne-sklepy/inpost.png|Inne/Sklepy",
-  "sprawdz@inpost.pl": "/home/linux/.git_projekt_mail/conky-automail-suite/avatar/inne-sklepy/inpost.png|Inne/Sklepy",
-  "powiadomienia@allegro.pl": "/home/linux/.git_projekt_mail/conky-automail-suite/avatar/inne-sklepy/allegro.png|Inne/Sklepy",
-  "info@powiadomienia.allegro.pl": "/home/linux/.git_projekt_mail/conky-automail-suite/avatar/inne-sklepy/allegro.png|Inne/Sklepy",
-  "ulubione@allegro.pl": "/home/linux/.git_projekt_mail/conky-automail-suite/avatar/inne-sklepy/allegro.png|Inne/Sklepy",
-  "service@payu.com": "/home/linux/.git_projekt_mail/conky-automail-suite/avatar/inne-sklepy/Payu.png|Inne/Sklepy"
+  "DEFAULT_PROFILE": "/home/linux/conky-automail-suite/avatar/DEFAULT/Default_2.png|Default",
+  "transaction@notice.aliexpress.com": "/home/linux/conky-automail-suite/avatar/inne-sklepy/Aliexpress.png|Inne/Sklepy",
+  "hello@newsletter.allegro.pl": "/home/linux/conky-automail-suite/avatar/inne-sklepy/allegro.png|Inne/Sklepy",
+  "info@paczkomaty.pl": "/home/linux/conky-automail-suite/avatar/inne-sklepy/inpost.png|Inne/Sklepy",
+  "sprawdz@inpost.pl": "/home/linux/conky-automail-suite/avatar/inne-sklepy/inpost.png|Inne/Sklepy",
+  "powiadomienia@allegro.pl": "/home/linux/conky-automail-suite/avatar/inne-sklepy/allegro.png|Inne/Sklepy",
+  "info@powiadomienia.allegro.pl": "/home/linux/conky-automail-suite/avatar/inne-sklepy/allegro.png|Inne/Sklepy",
+  "ulubione@allegro.pl": "/home/linux/conky-automail-suite/avatar/inne-sklepy/allegro.png|Inne/Sklepy",
+  "service@payu.com": "/home/linux/conky-automail-suite/avatar/inne-sklepy/Payu.png|Inne/Sklepy",
+  "noreply@github.com": "/home/linux/conky-automail-suite/avatar/inne-sklepy/GitHub.png|Inne/Sklepy",
+  "promotion@aliexpress.com": "/home/linux/conky-automail-suite/avatar/inne-sklepy/Aliexpress.png|Inne/Sklepy"
 }

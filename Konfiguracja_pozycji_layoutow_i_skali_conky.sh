@@ -21,52 +21,6 @@ trap 'rm -f /dev/shm/conky-automail-suite/.myconkyluadir.lock' EXIT
 LUA_FILE="lua/e-mail.lua"
 CONKY_FILE="conkyrc_mail"
 
-# ASCII ART
-ASCII_PREVIEWS="<tt>
- _______________________________________________
-|         [mail]                                |
-|         [mail]                                |
-|         [mail]                                | - <b>DOWN</b>
-|         [mail]                                |
-|[koperta][E-MAIL: Konto] --------------------- |
- ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
- _______________________________________________
-|[koperta][E-MAIL: Konto] --------------------- |
-|         [mail]                                |
-|         [mail]                                | - <b>UP</b>
-|         [mail]                                |
-|         [mail]                                |
- ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
- _______________________________________________
-|         [mail]                                |
-|         [mail]                                |
-|         [mail]                                | - <b>DOWN_RIGHT</b>
-|         [mail]                                |
-|[koperta][E-MAIL: Konto]---------------------- |
- ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
- _______________________________________________
-|[koperta][E-MAIL: Konto]---------------------- |
-|         [mail]                                |
-|         [mail]                                | - <b>UP_RIGHT</b>
-|         [mail]                                |
-|         [mail]                                |
- ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
- _______________________________________________
-|[mail]                                         |
-|[mail]                                         |
-|[mail]                                         | - <b>DOWN_LEFT</b>
-|[mail]                                         |
-|[E-MAIL: Konto]---------------------- [koperta]|
- ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
- _______________________________________________
-|[E-MAIL: Konto]---------------------- [koperta]|
-|[mail]                                         |
-|[mail]                                         | - <b>UP_LEFT</b>
-|[mail]                                         |
-|         [mail]                                |
- ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
-</tt>"
-
 # === FUNKCJE POMOCNICZE ===
 
 get_lua_bool() {
@@ -109,11 +63,12 @@ while true; do
     YAD_LAYOUT_OPTIONS=${YAD_LAYOUT_OPTIONS%?}
 
     # 2. Wyświetlenie okna
+    # ZMIANA: Usunięto $ASCII_PREVIEWS z parametru --text
     FORM_OUTPUT=$(yad --form --center \
         --title="Konfiguracja Widgetu Mail" \
         --width=800 \
         --text-align=left \
-        --text="<b>Podgląd dostępnych układów:</b>\n$ASCII_PREVIEWS\n<b>Skonfiguruj parametry widgetu:</b>" \
+        --text="<b>Skonfiguruj parametry widgetu:</b>" \
         \
         --field="Układ:CB" \
             "$YAD_LAYOUT_OPTIONS" \

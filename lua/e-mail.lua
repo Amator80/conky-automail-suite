@@ -52,9 +52,17 @@ MAIN_BG_BORDER_WIDTH = 5.0 * GLOBAL_SCALE_FACTOR  -- Grubość ramki.
 
 -- Kształt i pozycja
 MAIN_BG_RADIUS = 25 * GLOBAL_SCALE_FACTOR         -- Zaokrąglenie rogów.
-MAIN_BG_PADDING = 1.0 * GLOBAL_SCALE_FACTOR       -- Wewnętrzny margines od krawędzi okna conky.
-MAIN_BG_OFFSET_X = 0                              -- Ręczna korekta pozycji w osi X (+ w prawo, - w lewo).
-MAIN_BG_OFFSET_Y = 0                              -- Ręczna korekta pozycji w osi Y (+ w dół, - w górę).
+
+-- === HYBRYDOWY SYSTEM MARGINESÓW ===
+-- 1. BAZA (Globalny Padding): To odsuwa tło równo z KAŻDEJ strony.
+MAIN_BG_PADDING = 0.0 * GLOBAL_SCALE_FACTOR
+
+-- 2. KOREKTY (Extra Marginesy): To dodaje się do bazy dla konkretnej strony.
+-- Przykład: Jeśli PADDING = 10, a MARGIN_RIGHT = 50, to z prawej będzie łącznie 60 odstępu.
+MAIN_BG_MARGIN_LEFT   = 2.0 * GLOBAL_SCALE_FACTOR   -- Dodatkowy odstęp z LEWEJ
+MAIN_BG_MARGIN_RIGHT  = 2.0 * GLOBAL_SCALE_FACTOR   -- Dodatkowy odstęp z PRAWEJ
+MAIN_BG_MARGIN_TOP    = 2.0 * GLOBAL_SCALE_FACTOR   -- Dodatkowy odstęp z GÓRY
+MAIN_BG_MARGIN_BOTTOM = 2.0 * GLOBAL_SCALE_FACTOR   -- Dodatkowy odstęp z DOŁU
 
 
 ------------------- GŁÓWNE USTAWIENIA WIDGETU -------------------
@@ -100,7 +108,7 @@ PREVIEW_INDENT = false                            -- [true/false] Czy podgląd m
 MAIL_ROW_SPACING = 30 * GLOBAL_SCALE_FACTOR       -- Odstęp pionowy między mailami (px)
 MAIL_PREVIEW_SPACING = 7 * GLOBAL_SCALE_FACTOR    -- Odstęp pionowy między tematem a podgląдом maila (px)
 META_LINE_SPACING = 7 * GLOBAL_SCALE_FACTOR       -- Odstęp pionowy między preview a meta-linią (px, czyli trzecia linia)
-FROM_TO_SUBJECT_GAP = 12 * GLOBAL_SCALE_FACTOR    -- Odstęp poziomy między nadawcą a tematem (px)
+FROM_TO_SUBJECT_GAP = 7 * GLOBAL_SCALE_FACTOR     -- Odstęp poziomy między nadawcą a tematem (px)
 
 ------------------- AWATARY (PROFILOWE) - KONFIGURACJA UŻYTKOWNIKA -------------------
 -- Włącz/Wyłącz system awatarów [true/false]
@@ -127,7 +135,7 @@ DRAW_AVATAR_BORDER = false
 AVATAR_BORDER_WIDTH = 2.5
 
 -- Kolor obramowania {R, G, B, Alpha} (Zakres 0-1 lub 0-255 - skrypt obsłuży oba)
-AVATAR_BORDER_COLOR = {0.224, 1, 0, 1.0}
+AVATAR_BORDER_COLOR = {0.224, 1, 0, 0.80}
 
 -- Ścieżki systemowe awatarów (zaawansowane)
 AVATAR_RAM_MAP_FILE = "/dev/shm/conky-automail-suite/avatar_map.json"
@@ -356,11 +364,18 @@ CUSTOM_TEXT_COLOR_CUSTOM = {255, 60, 0}  -- Własny kolor RGB tekstu (jeśli cus
 SEPARATOR_ENABLE = true               -- [true/false] Czy wyświetlać linię oddzielającą?
 
 -- [MODYFIKACJA] Odejmujemy margines 725 od szerokości całkowitej
+-- Ta wartość ustala "domyślny" początek linii, jeśli nie włączysz opcji automatycznych.
 SEPARATOR_LENGTH = (GLOBAL_WIDTH_MODIFIER - 725) * GLOBAL_SCALE_FACTOR  -- Długość linii w px
 
 SEPARATOR_COLOR_TYPE = "white"        -- Kolor linii: "white", "black", "custom"
 SEPARATOR_COLOR_CUSTOM = {150, 150, 150}  -- Własny kolor RGB (gdy "custom")
 SEPARATOR_WIDTH = 3 * GLOBAL_SCALE_FACTOR   -- Grubość linii (px)
+
+-- === OCHRONA I DOPASOWANIE TEKSTU ===
+SEPARATOR_TEXT_GAP = 0 * GLOBAL_SCALE_FACTOR  -- Odstęp między końcem tekstu a początkiem linii (px)
+
+SEPARATOR_AUTO_SHORTEN = true         -- [true/false] Skracaj linię, jeśli tekst jest DŁUGI (żeby na niego nie weszła)
+SEPARATOR_AUTO_EXTEND  = true         -- [true/false] Wydłużaj linię w lewo, jeśli tekst jest KRÓTKI (żeby była przyklejona do tekstu)
 
 ------------------- 3 LINIA META (POD MAILEM – DANE TECHNICZNE, GODZINA, IP itp.) -------------------
 META_LINE_ENABLE = true
@@ -417,6 +432,19 @@ META_DATE_FORMAT_CUSTOM = "%H:%M:%S %d.%m.%Y"      -- Twój własny format, jeś
 ------------------------------------------------------------------------------------------
 -- *** KONIEC KONFIGURACJI. PONIŻEJ JEST KOD GŁÓWNY – NIE RUSZAĆ! ***
 ------------------------------------------------------------------------------------------
+
+-- ====================================================================================
+-- === TECHNICZNE: OPTYMALIZACJA CPU (BUFOROWANIE) ===
+-- ====================================================================================
+-- Ten blok obsługuje "usypianie" widgetu, gdy nic się nie dzieje, 
+-- ale z uwzględnieniem sekundnika (nie zamraża czasu, gdy jest < 60s).
+local static_buffer_surface = nil    -- Bufor "zamrożonego" obrazu
+local RENDER_MODE = "active"         -- Tryb pracy: "active" (rysuj) lub "idle" (użyj bufora)
+local RENDER_IDLE_AFTER = 2.0        -- Ile sekund po ostatniej animacji przejść w stan spoczynku
+local last_active_render_time = 0    -- Kiedy ostatnio coś się działo na ekranie
+local is_animation_running = false   -- Czy trwa jakaś animacja (scroll, pulsowanie)
+local last_buffer_update_time = 0    -- Kiedy ostatnio odświeżono bufor (dla zegara minutowego)
+-- ====================================================================================
 
 --- OSTATECZNA POPRAWKA v5 START (ZMIANA 1/4) ---
 -- ====================================================================================
@@ -1011,62 +1039,68 @@ local function set_font(cr, font_name, font_size, bold, italic)
 end
 
 -- =========================================================================
--- === OPTYMALIZACJA: Cache dla split_emoji (HYBRID PARSER v2) ===
+-- === OPTYMALIZACJA: Cache dla split_emoji (HYBRID PARSER v2 - ZUPIX OPTIMIZED) ===
 -- =========================================================================
 local split_emoji_cache = {}
 
+-- Zoptymalizowany parser (wersja z forka - grupowanie tekstu)
 local function split_emoji(text)
     if not text then return {} end
     if split_emoji_cache[text] then return split_emoji_cache[text] end
 
-    -- 1. Usuwamy modyfikatory skóry (Fitzpatrick type 1-6), bo Cairo ich nie lubi
-    -- Kody: F0 9F 8F [BB-BF]
-    local clean_text = text:gsub("\240\159\143[\187-\191]", "")
-
+    local clean_text = text:gsub("\240\159\143[\187-\191]", "") -- Usuwanie modyfikatorów skóry
     local res = {}
-    local len = #clean_text
     local i = 1
+    local len = #clean_text
     
     while i <= len do
-        local b = clean_text:byte(i)
-        local char_len = 1
-        local c_type = "text"
-
-        -- Analiza bajtów UTF-8 zgodnie z instrukcją
-        if b < 0x80 then 
-            char_len = 1        -- ASCII
-        elseif b < 0xE0 then 
-            char_len = 2        -- Znaki łacińskie rozszerzone, polskie itp. -> TEXT
-        elseif b < 0xF0 then
-            char_len = 3
-            c_type = "symbol"   -- 3-bajty (np. strzałki E2..) -> SYMBOL
-        else
-            char_len = 4
-            c_type = "emoji"    -- 4-bajty (np. emotki F0..) -> EMOJI
-        end
-
-        -- Optymalizacja: Grupowanie znaków tego samego typu
-        local start_i = i
-        i = i + char_len
+        local b1 = clean_text:byte(i)
         
-        while i <= len do
-            local nb = clean_text:byte(i)
-            local nlen = 1
-            local ntype = "text"
-            
-            if nb < 0x80 then nlen = 1
-            elseif nb < 0xE0 then nlen = 2
-            elseif nb < 0xF0 then nlen = 3; ntype = "symbol"
-            else nlen = 4; ntype = "emoji" end
+        local is_color_emoji = (b1 >= 0xF0)
+        local is_symbol      = (b1 >= 0xE0 and b1 < 0xF0)
 
-            if ntype == c_type then
-                i = i + nlen
-            else
-                break
+        if is_color_emoji then
+            -- Emoji (4 bajty + ewentualne sklejenia)
+            local current_chunk = ""
+            local char_len = 4
+            if i + char_len - 1 <= len then current_chunk = clean_text:sub(i, i + char_len - 1) end
+            i = i + char_len
+            while i <= len do
+                local nb = clean_text:byte(i)
+                if nb == 0xE2 or nb == 0xEF then
+                     local n_len = (nb < 0xE0) and 2 or ((nb < 0xF0) and 3 or 4)
+                     if i + n_len - 1 <= len then current_chunk = current_chunk .. clean_text:sub(i, i + n_len - 1) end
+                     i = i + n_len
+                else break end
+            end
+            table.insert(res, {type="emoji", txt=current_chunk})
+
+        elseif is_symbol then
+            -- Symbole (3 bajty - grupowanie)
+            local start = i
+            while i <= len do
+                local nb = clean_text:byte(i)
+                if nb >= 0xE0 and nb < 0xF0 then
+                    if i + 2 <= len then i = i + 3 else i = len + 1 break end
+                else
+                    break
+                end
+            end
+            table.insert(res, {type="symbol", txt=clean_text:sub(start, i - 1)})
+
+        else
+            -- Tekst (ASCII + UTF8 2-bajtowe) - grupowanie
+            local start = i
+            while i <= len do
+                local nb = clean_text:byte(i)
+                if nb >= 0xE0 then break end -- Stop na symbolu/emoji
+                local n_len = (nb < 0x80) and 1 or 2 
+                i = i + n_len
+            end
+            if i > start then
+                table.insert(res, {type="text", txt=clean_text:sub(start, i - 1)})
             end
         end
-
-        table.insert(res, {type=c_type, txt=clean_text:sub(start_i, i-1)})
     end
     
     -- Cache limiter
@@ -1131,7 +1165,6 @@ local function file_exists(path)
     if ok and f then f:close(); return true end
     return false
 end
-local FIRST_RUN = not file_exists("/dev/shm/conky-automail-suite/last_seen_mails.json")
 
 -- ===================================================================
 -- POCZĄTEK MODYFIKACJI
@@ -1159,29 +1192,6 @@ local is_first_run_of_script = true
 -- Przechowuje zbiór UID maili, które były widoczne w poprzedniej klatce animacji.
 local uids_visible_in_last_frame = load_last_visible_uids() -- [[ POPRAWKA PRZEWIJANIA ]]
 --- KONIEC POPRAWKI: ZMIENNE GLOBALNE DO KONTROLI STANU ---
-
-
--- ===============================================
--- Wczytywanie listy UID ostatnio wyświetlonych maili (do przewijania)
--- ===============================================
-local last_seen_uids = {}
-
-local function load_last_seen_uids()
-    local f = io.open("/dev/shm/conky-automail-suite/last_seen_mails.json", "r")
-    if not f then return {} end
-    local content = f:read("*a")
-    f:close()
-    local ok, uids = pcall(function() return json.decode(content) end)
-    if ok and type(uids) == "table" then
-        local set = {}
-        for _, uid in ipairs(uids) do set[uid] = true end
-        return set
-    end
-    return {}
-end
-
--- Załaduj UID-y na starcie Conky
-last_seen_uids = load_last_seen_uids()
 
 -- ===============================================
 -- Pomocnicze funkcje logiki "nowości" maila
@@ -1274,6 +1284,11 @@ end
 local function cached_text_width_emoji(cr, text, font, size, bold, italic)
     local k = cache_key_width(text, font, size, bold, italic)
     local w = width_cache[k]
+    
+    -- [OPTYMALIZACJA] Jeśli jesteśmy w trybie IDLE (uśpienia), spróbuj użyć cache
+    -- jeśli już istnieje, aby nie liczyć ponownie. Jeśli nie ma - policz.
+    if RENDER_MODE == "idle" and w then return w end 
+    
     if w then return w end
     w = text_width_with_emoji(cr, text or "", font, size, bold, italic)
     width_cache[k] = w
@@ -1283,6 +1298,10 @@ end
 local function cached_trim_emoji(cr, text, maxw, font, size, bold, italic)
     local k = table.concat({text or "", maxw or 0, font or "", size or 0, bold and "b" or "n", italic and "i" or "n"}, "|")
     local v = trim_cache[k]
+    
+    -- [OPTYMALIZACJA] Jak wyżej.
+    if RENDER_MODE == "idle" and v then return v end
+    
     if v then return v end
     v = trim_line_to_width_emoji(cr, text or "", maxw, font, size, bold, italic)
     trim_cache[k] = v
@@ -1292,8 +1311,7 @@ end
 
 -- [[ ZMIANA START ]]
 local auto_reset_suppress_list = {}
-local suppress_list_signature = "" -- Przechowuje "podpis" listy maili w momencie resetu
-local last_known_mtime = 0
+local suppress_list_signature = "" -- Przechowuje zbiór UID maili, które były widoczne w poprzedniej klatce animacji.
 -- [[ ZMIANA KONIEC ]]
 
 
@@ -1310,13 +1328,15 @@ local function read_file_content(path)
     return s
 end
 
-local function fetch_mails_from_cache()
+-- [OPTYMALIZACJA] Cache odczytu pliku (BEZ THROTTLINGU - FULL SPEED RAM)
+local function fetch_mails_from_cache(force_update)
     local CACHE_FILE = "/dev/shm/conky-automail-suite/mail_cache.json"
     
     -- ZAMIAST sprawdzać datę przez powłokę, po prostu czytamy plik z RAMu.
-    -- To jest o rzędy wielkości szybsze niż "date -r" wywoływane przez popen.
     local raw_content = read_file_content(CACHE_FILE)
 
+    -- [RAM SPEED] Jeśli treść jest identyczna jak w pamięci, zwracamy gotową tabelę (szybko).
+    -- Nie musimy robić json.decode, co oszczędza CPU, ale sprawdzamy plik w każdej klatce (I/O).
     if raw_content and raw_content == last_mail_cache_raw and cached_mail_data ~= nil then
         last_mail_json_ok = true
         return cached_mail_data
@@ -1371,25 +1391,61 @@ local function save_preview_lines_to_file()
 end
 save_preview_lines_to_file()
 
--- POPRAWKA: użycie cache dla PNG
+-- =========================================================================
+-- === OPTYMALIZACJA: CACHE TŁA I IKON (Zupix Optimization Pack 2) ===
+-- =========================================================================
+local MAIN_BG_SURFACE_CACHE = nil
+local ICON_SURFACE_CACHE = {} 
+
+-- ZOPTYMALIZOWANA funkcja rysowania PNG (Cache gotowych ikon)
 local function draw_png_rotated(cr, x, y, w, h, path, angle_deg, mirror_x)
+    -- Klucz cache: ścieżka + rozmiar + kąt + lustro
+    local cache_key = string.format("%s|%d|%d|%d|%s", path, w, h, angle_deg or 0, tostring(mirror_x))
+    
+    local cached_surf = ICON_SURFACE_CACHE[cache_key]
+    
+    if cached_surf then
+        -- Mamy gotowca! Rysujemy
+        cairo_set_source_surface(cr, cached_surf, x, y)
+        cairo_paint(cr)
+        return
+    end
+
+    -- Brak w cache - tworzymy
     local image = get_png_surface(path)
+    if not image then return end
+    
     local img_w = cairo_image_surface_get_width(image)
     local img_h = cairo_image_surface_get_height(image)
-    cairo_save(cr)
-    cairo_translate(cr, x + w/2, y + h/2)
-    cairo_rotate(cr, math.rad(angle_deg or 0))
+    
+    -- Tworzymy powierzchnię o wymiarach DOCELOWYCH (w, h)
+    local target = cairo_get_target(cr)
+    local surface = cairo_surface_create_similar(target, CAIRO_CONTENT_COLOR_ALPHA, w, h)
+    local cr_temp = cairo_create(surface)
+    
+    -- Wykonujemy transformacje na tymczasowym surface
+    cairo_translate(cr_temp, w/2, h/2)
+    cairo_rotate(cr_temp, math.rad(angle_deg or 0))
+    
     if mirror_x then
-        cairo_scale(cr, -w / img_w, h / img_h)
-        cairo_translate(cr, -img_w / 2, -img_h / 2)
+        cairo_scale(cr_temp, -w / img_w, h / img_h)
     else
-        cairo_scale(cr, w / img_w, h / img_h)
-        cairo_translate(cr, -img_w / 2, -img_h / 2)
+        cairo_scale(cr_temp, w / img_w, h / img_h)
     end
-    cairo_set_source_surface(cr, image, 0, 0)
+    
+    -- Centrowanie względem środka obrazka źródłowego
+    cairo_translate(cr_temp, -img_w / 2, -img_h / 2)
+    
+    cairo_set_source_surface(cr_temp, image, 0, 0)
+    cairo_paint(cr_temp)
+    cairo_destroy(cr_temp)
+    
+    -- Zapis do cache
+    ICON_SURFACE_CACHE[cache_key] = surface
+    
+    -- Rysowanie na ekranie
+    cairo_set_source_surface(cr, surface, x, y)
     cairo_paint(cr)
-    cairo_restore(cr)
-    -- NIE niszczymy surface, bo cache!
 end
 
     
@@ -1411,32 +1467,6 @@ local function get_mail_id(mail)
     end
 
     return subj .. "|" .. from .. "|" .. preview
-end
-
-local function trim_line_to_width(cr, text, max_width)
-    local ellipsis = "..."
-    cairo_text_extents(cr, ellipsis, GLOBAL_TEXT_EXTENTS)
-    local ellipsis_width = GLOBAL_TEXT_EXTENTS.width
-
-    local trimmed = text
-    local total_width = 0
-    local last_good = ""
-
-    for i = 1, utf8_len(text) do
-        local chunk = utf8_sub(text, 1, i)
-        cairo_text_extents(cr, chunk .. ellipsis, GLOBAL_TEXT_EXTENTS)
-        if GLOBAL_TEXT_EXTENTS.width > max_width then
-            break
-        end
-        last_good = chunk
-    end
-
-    cairo_text_extents(cr, text, GLOBAL_TEXT_EXTENTS)
-    if GLOBAL_TEXT_EXTENTS.width <= max_width then
-        return text
-    end
-
-    return last_good .. ellipsis
 end
 
 -- DEKODER BEZPIECZNYCH WARTOŚCI RGB
@@ -1564,6 +1594,9 @@ local function attachment_blink_is_visible(mail, now)
         return true
     end
 
+    -- [OPTYMALIZACJA] Jeśli widget śpi, nie sprawdzaj stanów, po prostu rysuj.
+    if RENDER_MODE == "idle" then return true end
+
     if SUPPRESS_BLINK_THIS_SESSION then
         local id_suppress = mail.uid or ((mail.subject or "") .. (mail.from or ""))
         if SUPPRESS_BLINK_IDS and SUPPRESS_BLINK_IDS[id_suppress] then
@@ -1578,6 +1611,7 @@ local function attachment_blink_is_visible(mail, now)
         if should_animate_pulse_blink(mail) then
             st = { start = now }
             attachment_blink_states[id] = st
+            is_animation_running = true -- Zgłoś, że coś się dzieje
         else
             return true
         end
@@ -1597,6 +1631,8 @@ local function attachment_blink_is_visible(mail, now)
     if phase >= max_phases then
         return true
     end
+
+    is_animation_running = true -- Zgłoś, że coś się dzieje
     return (phase % 2) == 0
 end
 
@@ -1646,6 +1682,9 @@ local function get_pulse_state(mail, now)
         return default_state
     end
 
+    -- [OPTYMALIZACJA] Jeśli śpimy, nie animuj.
+    if RENDER_MODE == "idle" then return default_state end
+
     local id = mail.uid or get_mail_id(mail)
     local state = mail_pulse_states[id]
     
@@ -1653,6 +1692,7 @@ local function get_pulse_state(mail, now)
         if should_animate_pulse_blink(mail) then
             state = { start_time = now }
             mail_pulse_states[id] = state
+            is_animation_running = true -- Zgłoś aktywność
         else
             return default_state
         end
@@ -1670,6 +1710,8 @@ local function get_pulse_state(mail, now)
     if elapsed > PULSE_ANIM_DURATION then
         return default_state
     end
+
+    is_animation_running = true -- Zgłoś aktywność
 
     local sin_wave = math.sin(elapsed * PULSE_ANIM_SPEED)
     local normalized_wave = (sin_wave + 1) / 2
@@ -1750,13 +1792,36 @@ local function draw_from_scrolling(cr, mail, from_txt, x, y, force_scroll_active
     local maxw = FROM_MAX_WIDTH
     local scroll_enable = FROM_SCROLL_ENABLE
     
+    -- [OPTYMALIZACJA] W trybie IDLE rysuj tylko statycznie
+    if RENDER_MODE == "idle" then
+        local trimmed = cached_trim_emoji(cr, from_txt, maxw, FROM_FONT_NAME, FROM_FONT_SIZE, FROM_FONT_BOLD, FROM_FONT_ITALIC)
+        draw_colored_sender(cr, mail, trimmed, x, y)
+        return x + maxw -- przybliżone return
+    end
+    
     set_font(cr, FROM_FONT_NAME, FROM_FONT_SIZE, FROM_FONT_BOLD, FROM_FONT_ITALIC)
-    local total_width = text_width_with_emoji(cr, from_txt, FROM_FONT_NAME, FROM_FONT_SIZE, FROM_FONT_BOLD, FROM_FONT_ITALIC)
+    local total_width = cached_text_width_emoji(cr, from_txt, FROM_FONT_NAME, FROM_FONT_SIZE, FROM_FONT_BOLD, FROM_FONT_ITALIC)
     
     local unique_id_for_suppression = get_mail_id(mail)
     local is_suppressed = auto_reset_suppress_list[unique_id_for_suppression] or false
 
+    local mail_id = get_mail_from_id(mail, from_txt)
+    local now = now_time()
+    local state = from_scroll_states[mail_id]
+    
+    if not state or state.last_mail_id ~= mail_id then
+        state = {start_time=now, phase="start", rep=0, last_mail_id=mail_id}
+        from_scroll_states[mail_id] = state
+
+        if (not force_scroll_active and should_start_scrolling(mail) == false) or is_first_run_of_script then
+            state.phase = "done"
+        end
+    end
+
     if total_width <= maxw or not scroll_enable or is_suppressed then
+        -- [WAŻNE] Jeśli nie trzeba przewijać, oznacz jako "done", żeby nie blokować usypiania
+        if state then state.phase = "done" end
+        
         local text_to_draw = from_txt
         if total_width > maxw then
             text_to_draw = trim_line_to_width_emoji(cr, from_txt, maxw, FROM_FONT_NAME, FROM_FONT_SIZE, FROM_FONT_BOLD, FROM_FONT_ITALIC)
@@ -1765,6 +1830,9 @@ local function draw_from_scrolling(cr, mail, from_txt, x, y, force_scroll_active
         
         return x + math.min(total_width, maxw)
     end
+    
+    -- Jeśli nie jest "done", znaczy że animacja trwa -> zgłoś aktywność
+    if state.phase ~= "done" then is_animation_running = true end
     
     local scroll_speed  = FROM_SCROLL_SPEED
     local scroll_repeat = FROM_SCROLL_REPEAT
@@ -1780,24 +1848,6 @@ local function draw_from_scrolling(cr, mail, from_txt, x, y, force_scroll_active
     local alias_font_bold   = ALIAS_FONT_BOLD
     local alias_font_size   = ALIAS_FONT_SIZE
     local alias_font_italic = ALIAS_FONT_ITALIC
-
-    local mail_id = get_mail_from_id(mail, from_txt)
-    local now = now_time()
-    local state = from_scroll_states[mail_id]
-    
-    --- POCZĄTEK POPRAWKI: MODYFIKACJA INICJALIZACJI STANU ---
-    if not state or state.last_mail_id ~= mail_id then
-        state = {start_time=now, phase="start", rep=0, last_mail_id=mail_id}
-        from_scroll_states[mail_id] = state
-
-        --- ZMIANA START ---
-        -- [[ POPRAWKA PRZEWIJANIA v2 ]]
-        if (not force_scroll_active and should_start_scrolling(mail) == false) or is_first_run_of_script then
-        --- ZMIANA KONIEC ---
-            state.phase = "done"
-        end
-    end
-    --- KONIEC POPRAWKI: MODYFIKACJA INICJALIZACJI STANU ---
 
     local alias_prefix = ""
     local sender_part = from_txt
@@ -1815,10 +1865,10 @@ local function draw_from_scrolling(cr, mail, from_txt, x, y, force_scroll_active
     local alias_width = 0
     if has_alias then
         set_font(cr, alias_font_name, alias_font_size, alias_font_bold, alias_font_italic)
-        alias_width = text_width_with_emoji(cr, alias_prefix, alias_font_name, alias_font_size, alias_font_bold, alias_font_italic)
+        alias_width = cached_text_width_emoji(cr, alias_prefix, alias_font_name, alias_font_size, alias_font_bold, alias_font_italic)
     end
     set_font(cr, from_font_name, from_font_size, from_font_bold, from_font_italic)
-    local sender_width = text_width_with_emoji(cr, sender_part, from_font_name, from_font_size, from_font_bold, from_font_italic)
+    local sender_width = cached_text_width_emoji(cr, sender_part, from_font_name, from_font_size, from_font_bold, from_font_italic)
 
     local sender_x = x + alias_width
     local sender_max_w = maxw - alias_width
@@ -1849,16 +1899,11 @@ local function draw_from_scrolling(cr, mail, from_txt, x, y, force_scroll_active
     
     if phase == "start" then
         if elapsed < delay_start then
-            local trimmed_sender = trim_line_to_width_emoji(cr, sender_part, sender_max_w, from_font_name, from_font_size, from_font_bold, from_font_italic)
+            local trimmed_sender = cached_trim_emoji(cr, sender_part, sender_max_w, from_font_name, from_font_size, from_font_bold, from_font_italic)
             draw_emoji_text(cr, trimmed_sender, from_font_name, from_font_bold, from_font_size, sender_x, y, from_font_italic)
         else
             state.phase = "scroll"
             state.start_time = now
-            cairo_save(cr)
-            cairo_rectangle(cr, sender_x, y - from_font_size, sender_max_w, from_font_size + (12 * GLOBAL_SCALE_FACTOR))
-            cairo_clip(cr)
-            draw_emoji_text(cr, sender_part, from_font_name, from_font_bold, from_font_size, sender_x, y, from_font_italic)
-            cairo_restore(cr)
         end
 
     elseif phase == "scroll" then
@@ -1895,7 +1940,7 @@ local function draw_from_scrolling(cr, mail, from_txt, x, y, force_scroll_active
         end
         
     elseif phase == "done" then
-        local trimmed_sender = trim_line_to_width_emoji(cr, sender_part, sender_max_w, from_font_name, from_font_size, from_font_bold, from_font_italic)
+        local trimmed_sender = cached_trim_emoji(cr, sender_part, sender_max_w, from_font_name, from_font_size, from_font_bold, from_font_italic)
         draw_emoji_text(cr, trimmed_sender, from_font_name, from_font_bold, from_font_size, sender_x, y, from_font_italic)
     end
     
@@ -1905,6 +1950,14 @@ end
 local function draw_scrolling_text(cr, key, mail, text, x, y, maxw, font_name, font_size, font_bold, font_italic, opt, force_scroll_active)
     if not text or text == "" then return end
     
+    -- [OPTYMALIZACJA]
+    if RENDER_MODE == "idle" then
+        set_font(cr, font_name, font_size, font_bold, font_italic)
+        local trimmed = cached_trim_emoji(cr, text, maxw, font_name, font_size, font_bold, font_italic)
+        draw_emoji_text(cr, trimmed, font_name, font_bold, font_size, x, y, font_italic)
+        return
+    end
+
     local unique_id_for_suppression = get_mail_id(mail)
     if auto_reset_suppress_list[unique_id_for_suppression] then
         set_font(cr, font_name, font_size, font_bold, font_italic)
@@ -1940,10 +1993,14 @@ local function draw_scrolling_text(cr, key, mail, text, x, y, maxw, font_name, f
     local text_width = cached_text_width_emoji(cr, text, font_name, font_size, font_bold, font_italic)
 
 if text_width <= maxw or not opt.scroll_enable then
+    if state then state.phase = "done" end -- Oznacz jako done, żeby nie blokować usypiania
     local trimmed = cached_trim_emoji(cr, text, maxw, font_name, font_size, font_bold, font_italic)
     draw_emoji_text(cr, trimmed, font_name, font_bold, font_size, x, y, font_italic)
     return
 end
+
+    -- Jeśli nie done, zgłoś aktywność
+    if state.phase ~= "done" then is_animation_running = true end
 
     local scroll_extra = opt.scroll_extra or (36 * GLOBAL_SCALE_FACTOR)
     local scroll_len = text_width - maxw + scroll_extra
@@ -2012,42 +2069,83 @@ local function draw_main_background(cr)
 
     if conky_window == nil then return end
 
-    local padding = MAIN_BG_PADDING or 0
-    local x = padding + (MAIN_BG_OFFSET_X or 0)
-    local y = padding + (MAIN_BG_OFFSET_Y or 0)
-    local w = conky_window.width - (2 * padding)
-    local h = conky_window.height - (2 * padding)
+    -- Sprawdźmy, czy wymiary okna się nie zmieniły (np. przy restarcie conky)
+    local win_w = conky_window.width
+    local win_h = conky_window.height
+
+    -- === OPTYMALIZACJA ZUPIX: Jeśli mamy gotowe tło i pasuje wymiarami, użyj go ===
+    if MAIN_BG_SURFACE_CACHE then
+        local cw = cairo_image_surface_get_width(MAIN_BG_SURFACE_CACHE)
+        local ch = cairo_image_surface_get_height(MAIN_BG_SURFACE_CACHE)
+        if cw == win_w and ch == win_h then
+            cairo_set_source_surface(cr, MAIN_BG_SURFACE_CACHE, 0, 0)
+            cairo_paint(cr)
+            return -- KONIEC, nic więcej nie liczymy!
+        else
+            -- Wymiary się zmieniły, kasujemy stare cache
+            cairo_surface_destroy(MAIN_BG_SURFACE_CACHE)
+            MAIN_BG_SURFACE_CACHE = nil
+        end
+    end
+    -- ============================================================================
+
+    -- === TWORZENIE NOWEGO CACHE (Tylko raz!) ===
+    -- Tworzymy powierzchnię o rozmiarze całego okna
+    local surface = cairo_surface_create_similar(cairo_get_target(cr), CAIRO_CONTENT_COLOR_ALPHA, win_w, win_h)
+    local cr_temp = cairo_create(surface)
+
+    -- === HYBRYDOWA LOGIKA: PADDING + EXTRA MARGINES ===
+    local base_pad = MAIN_BG_PADDING or 0
+    local final_left   = base_pad + (MAIN_BG_MARGIN_LEFT or 0)
+    local final_right  = base_pad + (MAIN_BG_MARGIN_RIGHT or 0)
+    local final_top    = base_pad + (MAIN_BG_MARGIN_TOP or 0)
+    local final_bottom = base_pad + (MAIN_BG_MARGIN_BOTTOM or 0)
+
+    local x = final_left
+    local y = final_top
+    local w = win_w - (final_left + final_right)
+    local h = win_h - (final_top + final_bottom)
+
     local radius = MAIN_BG_RADIUS or 0
-    
     local max_radius = math.min(w, h) / 2
     if radius > max_radius then radius = max_radius end
 
-    cairo_save(cr)
-    cairo_new_path(cr)
-    cairo_move_to(cr, x + radius, y)
-    cairo_arc(cr, x + w - radius, y + radius, radius, -math.pi/2, 0)
-    cairo_arc(cr, x + w - radius, y + h - radius, radius, 0, math.pi/2)
-    cairo_arc(cr, x + radius, y + h - radius, radius, math.pi/2, math.pi)
-    cairo_arc(cr, x + radius, y + radius, radius, math.pi, 1.5*math.pi)
-    cairo_close_path(cr)
+    -- Rysujemy na tymczasowym kontekście (cr_temp)
+    cairo_new_path(cr_temp)
+    cairo_move_to(cr_temp, x + radius, y)
+    cairo_arc(cr_temp, x + w - radius, y + radius, radius, -math.pi/2, 0)
+    cairo_arc(cr_temp, x + w - radius, y + h - radius, radius, 0, math.pi/2)
+    cairo_arc(cr_temp, x + radius, y + h - radius, radius, math.pi/2, math.pi)
+    cairo_arc(cr_temp, x + radius, y + radius, radius, math.pi, 1.5*math.pi)
+    cairo_close_path(cr_temp)
 
     if MAIN_BG_FILL_ENABLE then
         local r, g, b = decode_rgb3(MAIN_BG_FILL_COLOR)
-        cairo_set_source_rgba(cr, r, g, b, clamp01(MAIN_BG_FILL_ALPHA or 0.5))
-        cairo_fill_preserve(cr)
+        cairo_set_source_rgba(cr_temp, r, g, b, clamp01(MAIN_BG_FILL_ALPHA or 0.5))
+        cairo_fill_preserve(cr_temp)
     end
 
     if MAIN_BG_BORDER_ENABLE then
         local br, bg, bb = decode_rgb3(MAIN_BG_BORDER_COLOR)
-        cairo_set_source_rgba(cr, br, bg, bb, clamp01(MAIN_BG_BORDER_ALPHA or 0.2))
-        cairo_set_line_width(cr, MAIN_BG_BORDER_WIDTH or 2)
-        cairo_stroke(cr)
-    else
-        cairo_new_path(cr)
+        cairo_set_source_rgba(cr_temp, br, bg, bb, clamp01(MAIN_BG_BORDER_ALPHA or 0.2))
+        cairo_set_line_width(cr_temp, MAIN_BG_BORDER_WIDTH or 2)
+        cairo_stroke(cr_temp)
     end
-    cairo_restore(cr)
+
+    cairo_destroy(cr_temp) -- Sprzątamy malarza
+
+    -- Zapisujemy gotowy obrazek do zmiennej globalnej
+    MAIN_BG_SURFACE_CACHE = surface
+
+    -- Rysujemy go na głównym ekranie
+    cairo_set_source_surface(cr, surface, 0, 0)
+    cairo_paint(cr)
+    -- === KONIEC OPTYMALIZACJI ===
 end
 
+  
+
+-- PONIŻEJ JEST FUNKCJA, KTÓRĄ PRZYPADKOWO USUNĄŁEŚ - MUSI TU BYĆ!
 local function draw_per_mail_milk(
     cr, x, y, w, h, radius,
     fill_enable, fill_color, fill_alpha,
@@ -2194,12 +2292,21 @@ end
 -- =============================================================
 local function draw_meta_line_rich(cr, mail, x, y, force_scroll_active, dynamic_max_width)
     local meta_id = "meta|" .. (mail.uid or get_mail_id(mail))
+    
+    local segments = build_meta_line_segments(mail)
+    if #segments == 0 then return end
+    
+    local current_max_width = dynamic_max_width or META_LINE_MAX_WIDTH
+
+    -- [OPTYMALIZACJA]
+    if RENDER_MODE == "idle" then
+        draw_meta_segments_trimmed(cr, segments, META_LINE_FONT_NAME, META_LINE_FONT_BOLD, META_LINE_FONT_SIZE, META_LINE_FONT_ITALIC, x, y, current_max_width)
+        return
+    end
+
     local now = now_time()
     local state = meta_scroll_states[meta_id]
     
-    -- Jeśli nie podano dynamicznej szerokości, użyj domyślnej
-    local current_max_width = dynamic_max_width or META_LINE_MAX_WIDTH
-
     -- [[ POPRAWKA PRZEWIJANIA v3 ]]
     if not state or state.last_mail_id ~= meta_id then
         state = {start_time=now, phase="start", rep=0, last_mail_id=meta_id}
@@ -2214,9 +2321,6 @@ local function draw_meta_line_rich(cr, mail, x, y, force_scroll_active, dynamic_
     local font_size = META_LINE_FONT_SIZE
     local font_italic = META_LINE_FONT_ITALIC
 
-    local segments = build_meta_line_segments(mail)
-    if #segments == 0 then return end
-
     local sig = segments_signature(segments)
     local key = table.concat({sig, font_name, font_size, font_bold and "b" or "n", font_italic and "i" or "n"}, "|")
     local total_width = meta_width_cache[key]
@@ -2227,9 +2331,12 @@ local function draw_meta_line_rich(cr, mail, x, y, force_scroll_active, dynamic_
 
     -- Używamy calculated current_max_width zamiast globalnej stałej
     if total_width <= current_max_width or not META_LINE_SCROLL_ENABLE then
+        if state then state.phase = "done" end
         draw_meta_segments_trimmed(cr, segments, font_name, font_bold, font_size, font_italic, x, y, current_max_width)
         return
     end
+
+    if state.phase ~= "done" then is_animation_running = true end
 
     local scroll_extra = META_LINE_SCROLL_EXTRA or (36 * GLOBAL_SCALE_FACTOR)
     local scroll_len = total_width - current_max_width + scroll_extra
@@ -2298,11 +2405,57 @@ local function draw_custom_user_text(cr)
 end
 
 local function draw_separator(cr)
-    if not SEPARATOR_ENABLE then return end
-    local x1 = SEPARATOR_X
+    -- === FIX: RESET ŚCIEŻKI GDY WYŁĄCZONE ===
+    if not SEPARATOR_ENABLE then 
+        -- Musimy "podnieść ołówek" (zresetować ścieżkę), w przeciwnym razie
+        -- następny element (Badge) dorysuje linię od końca tekstu do siebie.
+        cairo_new_path(cr)
+        return 
+    end
+    
+    -- Domyślne współrzędne wynikające z layoutu
+    local default_start_x = SEPARATOR_X
+    local fixed_end_x     = SEPARATOR_X + SEPARATOR_LENGTH
+    
+    local x1 = default_start_x
     local y1 = SEPARATOR_Y
-    local x2 = SEPARATOR_X + SEPARATOR_LENGTH
+    local x2 = fixed_end_x
     local y2 = SEPARATOR_Y
+
+    -- === FIX DYNAMICZNY: DOPASOWANIE DO DŁUGOŚCI TEKSTU ===
+    if CUSTOM_TEXT_ENABLE and CUSTOM_TEXT_VALUE and CUSTOM_TEXT_VALUE ~= "" then
+        
+        -- 1. Zmierz szerokość tekstu
+        local text_w = cached_text_width_emoji(
+            cr, 
+            CUSTOM_TEXT_VALUE, 
+            CUSTOM_TEXT_FONT, 
+            CUSTOM_TEXT_SIZE, 
+            CUSTOM_TEXT_BOLD, 
+            CUSTOM_TEXT_ITALIC
+        )
+        
+        -- 2. Oblicz idealny punkt startu linii (koniec tekstu + odstęp)
+        local text_end_x = CUSTOM_TEXT_POS.x + text_w
+        local safe_gap = SEPARATOR_TEXT_GAP or 0
+        local ideal_start_x = text_end_x + safe_gap
+
+        -- 3. Logika dopasowania
+        
+        -- A) Jeśli tekst jest DŁUGI i wchodzi na linię -> SKRÓĆ LINIĘ (przesuń start w prawo)
+        if SEPARATOR_AUTO_SHORTEN and (ideal_start_x > x1) then
+            x1 = ideal_start_x
+        end
+        
+        -- B) Jeśli tekst jest KRÓTKI i jest dziura -> WYDŁUŻ LINIĘ (przesuń start w lewo)
+        if SEPARATOR_AUTO_EXTEND and (ideal_start_x < x1) then
+            x1 = ideal_start_x
+        end
+        
+        -- Zabezpieczenie: Żeby linia nie zaczęła się "za" swoim końcem
+        if x1 > x2 then x1 = x2 end
+    end
+    -- ==========================================================
 
     set_color(cr, SEPARATOR_COLOR_TYPE, SEPARATOR_COLOR_CUSTOM)
     cairo_set_line_width(cr, SEPARATOR_WIDTH or (1.5 * GLOBAL_SCALE_FACTOR))
@@ -2329,30 +2482,37 @@ local function get_mail_block_height(mail)
     end
 end
 
--- [[ OPTYMALIZACJA START ]]
-local function read_mail_scroll_offset()
-    -- ZAMIAST "date -r" (popen), CZYTAMY BEZPOŚREDNIO Z PLIKU
+-- [[ OPTYMALIZACJA: CACHE OFFSETU W RAM ]]
+-- Zmienna przechowująca offset w pamięci (domyślnie 0)
+local cached_scroll_offset_val = 0
+
+-- Funkcja pomocnicza: Idź do dysku i zaktualizuj pamięć (wywoływana RZADKO, tylko przy zmianie)
+local function sync_scroll_offset_from_disk()
     local f = io.open(MAIL_SCROLL_FILE, "r")
-    if not f then return 0 end
+    if not f then
+        cached_scroll_offset_val = 0
+        return
+    end
     local content = f:read("*a") or "0"
     f:close()
-    return tonumber(content:match("%-?%d+")) or 0
+    cached_scroll_offset_val = tonumber(content:match("%-?%d+")) or 0
+end
+
+-- Funkcja główna: Zwraca wartość z RAM (0 obciążenia dysku, wywoływana co klatkę)
+local function read_mail_scroll_offset()
+    return cached_scroll_offset_val
 end
 -- [[ OPTYMALIZACJA KONIEC ]]
 
 
 local function write_mail_scroll_offset(offset)
+    cached_scroll_offset_val = offset -- Aktualizuj RAM przy zapisie
     local f = io.open(MAIL_SCROLL_FILE, "w")
     if f then f:write(tostring(offset)); f:close() end
 end
 
--- [[ OPTYMALIZACJA USUNIĘTA ]]
--- Ta funkcja nie jest już potrzebna, ponieważ zastąpiła ją uniwersalna `get_file_mtime`.
--- local function get_mail_scroll_mtime() ... end
--- [[ OPTYMALIZACJA USUNIĘTA ]]
-
 local function apply_mail_scroll(filtered_mails, MAX_MAILS, MAILS_DIRECTION)
-    local offset = read_mail_scroll_offset()
+    local offset = read_mail_scroll_offset() -- Teraz czyta z RAM
 
     local N = #filtered_mails
     local max_visible = math.max(0, MAX_MAILS or 0)
@@ -2373,14 +2533,23 @@ local function apply_mail_scroll(filtered_mails, MAX_MAILS, MAILS_DIRECTION)
 end
 
 -- ====================================================================================
--- === FUNKCJE POMOCNICZE AWATARÓW (ZINTEGROWANE) ===
+-- === FUNKCJE POMOCNICZE AWATARÓW (ZINTEGROWANE - WERSJA CICHY LOG) ===
 -- ====================================================================================
 local avatar_map_cache = {}
 local last_trigger_value = -1
 local image_surface_cache = {}
 local image_cache_count = 0
 local MAX_CACHE_SIZE = 50
-local last_ram_check_time = 0
+
+-- =========================================================================
+-- === OPTYMALIZACJA: CACHE AVATARÓW, TŁA I IKON (Zupix Optimization Pack) ===
+-- =========================================================================
+local AVATAR_SURFACE_CACHE = {} 
+local MAIN_BG_SURFACE_CACHE = nil
+local ICON_SURFACE_CACHE = {} 
+
+-- [ZMIANA] Trwały uchwyt do pliku triggera, żeby nie robić ciągle OPEN/CLOSE
+local persistent_trigger_handle = nil
 
 local function cleanup_avatar_cache_if_needed()
     if image_cache_count > MAX_CACHE_SIZE then
@@ -2398,26 +2567,17 @@ end
 -- =========================================================================
 local function get_avatar_image(path)
     if not path then return nil end
-    
-    -- 1. Najpierw sprawdź RAM (najszybciej)
-    if image_surface_cache[path] then 
-        return image_surface_cache[path] 
-    end
+    if image_surface_cache[path] then return image_surface_cache[path] end
     
     cleanup_avatar_cache_if_needed()
-
-    -- 2. Zamiast otwierać plik io.open (co kosztuje I/O),
-    -- po prostu spróbuj go załadować przez Cairo. Jeśli nie istnieje lub jest uszkodzony,
-    -- Cairo ustawi odpowiedni status.
     local surface = cairo_image_surface_create_from_png(path)
     local status = cairo_surface_status(surface)
     
-    if status == 0 then -- CAIRO_STATUS_SUCCESS
+    if status == 0 then
         image_surface_cache[path] = surface
         image_cache_count = image_cache_count + 1
         return surface
     else
-        -- Jeśli się nie udało (np. brak pliku), niszczymy pusty obiekt i zwracamy nil
         cairo_surface_destroy(surface)
         return nil
     end
@@ -2445,11 +2605,26 @@ local function create_avatar_path(cr, x, y, size, shape)
     end
 end
 
+-- [ZMIANA] Nowa funkcja czytająca z otwartego uchwytu
 local function read_trigger_ram()
-    local f = io.open(AVATAR_TRIGGER_FILE, "r")
-    if not f then return 0 end
-    local val = f:read("*a")
-    f:close()
+    -- Jeśli nie mamy uchwytu, spróbujmy otworzyć plik
+    if not persistent_trigger_handle then
+        local f = io.open(AVATAR_TRIGGER_FILE, "r")
+        if not f then return 0 end -- Plik jeszcze nie istnieje
+        persistent_trigger_handle = f
+    end
+
+    -- Przewiń na początek pliku (bez zamykania/otwierania!)
+    persistent_trigger_handle:seek("set", 0)
+    local val = persistent_trigger_handle:read("*a")
+    
+    -- Jeśli odczyt zwrócił nil (np. plik skasowany zewnętrznie), zresetuj uchwyt
+    if not val then
+        persistent_trigger_handle:close()
+        persistent_trigger_handle = nil
+        return 0
+    end
+
     return tonumber(val) or 0
 end
 
@@ -2459,6 +2634,7 @@ local function write_to_ram(content)
         f:write(content)
         f:close()
     end
+    -- Trigger zapisujemy normalnie (Bash też go tak zapisuje)
     local trig = io.open(AVATAR_TRIGGER_FILE, "w")
     if trig then
         trig:write(os.time())
@@ -2467,13 +2643,7 @@ local function write_to_ram(content)
 end
 
 local function ensure_avatar_map_loaded()
-    -- OPTYMALIZACJA: Sprawdzaj plik triggera max raz na sekundę, nie częściej!
-    local now = os.time()
-    if now == last_ram_check_time and next(avatar_map_cache) ~= nil then
-        return
-    end
-    last_ram_check_time = now
-
+    -- Czytamy trigger używając stałego uchwytu (brak logów OPEN)
     local current_trigger = read_trigger_ram()
     
     if current_trigger == last_trigger_value and next(avatar_map_cache) ~= nil then
@@ -2481,6 +2651,7 @@ local function ensure_avatar_map_loaded()
     end
 
     -- Jeśli trigger się zmienił, czytamy mapę
+    -- Tutaj nadal używamy io.open, ale to zdarzy się rzadko (tylko przy zmianie avatara)
     local f = io.open(AVATAR_RAM_MAP_FILE, "r")
     local loaded_from = "RAM"
     local content = nil
@@ -2519,14 +2690,11 @@ local function extract_email_from_string(full_string)
     return email and email:lower() or ""
 end
 
--- Lokalna funkcja rysująca awatar (dawniej w osobnym pliku)
+-- Lokalna funkcja rysująca awatar (ZOPTYMALIZOWANA - Pre-render)
 local function draw_avatar_local(cr, mail_from_raw, x, y, size)
     -- Jeśli wyłączone lub błędny rozmiar -> natychmiast STOP
     if not SHOW_AVATARS or (size == nil) or (size <= 0) then return end
 
-    -- [[ OPTYMALIZACJA ]] Usunięto wywołanie ensure_avatar_map_loaded() stąd.
-    -- Jest teraz wywoływane raz na klatkę w głównej funkcji.
-    
     local email = extract_email_from_string(mail_from_raw)
     local raw_value = avatar_map_cache[email]
     
@@ -2541,34 +2709,58 @@ local function draw_avatar_local(cr, mail_from_raw, x, y, size)
     if not img_path or img_path == "" then img_path = DEFAULT_AVATAR_PATH end
     if not img_path then return end 
 
-    -- Operacje graficzne
-    local surface = get_avatar_image(img_path)
-    if not surface then return end
-
-    local w = cairo_image_surface_get_width(surface)
-    local h = cairo_image_surface_get_height(surface)
-    
-    if w <= 0 or h <= 0 then return end
-
+    -- === OPTYMALIZACJA ZUPIX: START ===
     local shape = AVATAR_SHAPE or "circle"
-    
-    cairo_save(cr)
-    create_avatar_path(cr, x, y, size, shape)
-    cairo_save(cr)
-    cairo_clip(cr)
-    
-    local scale = math.max(size / w, size / h)
-    local trans_x = x + (size - (w * scale)) / 2
-    local trans_y = y + (size - (h * scale)) / 2
-    
-    cairo_translate(cr, trans_x, trans_y)
-    cairo_scale(cr, scale, scale)
-    cairo_set_source_surface(cr, surface, 0, 0)
-    
-    -- [ZMIANA] Używamy zmiennej AVATAR_ALPHA (lub 1.0 jeśli brak zmiennej)
-    cairo_paint_with_alpha(cr, AVATAR_ALPHA or 1.0)
-    
-    cairo_restore(cr)
+    local cache_key = img_path .. "|" .. size .. "|" .. shape
+
+    local cached_surf = AVATAR_SURFACE_CACHE[cache_key]
+
+    if cached_surf then
+        -- MAMY GOTOWCA! Wklejamy go w ułamku milisekundy.
+        cairo_set_source_surface(cr, cached_surf, x, y)
+        -- [ZMIANA] Używamy zmiennej AVATAR_ALPHA (lub 1.0 jeśli brak zmiennej)
+        cairo_paint_with_alpha(cr, AVATAR_ALPHA or 1.0)
+    else
+        -- BRAK W CACHE - Tworzymy go (tylko raz!)
+        
+        -- 1. Ładujemy surowy plik
+        local raw_image = get_avatar_image(img_path)
+        if not raw_image then return end
+
+        -- 2. Tworzymy nowy, pusty surface o wymiarach idealnie pod ten avatar
+        -- Używamy create_similar, żeby był kompatybilny z ekranem (najszybszy format)
+        local target = cairo_get_target(cr)
+        local final_surf = cairo_surface_create_similar(target, CAIRO_CONTENT_COLOR_ALPHA, size, size)
+        local cr_temp = cairo_create(final_surf)
+
+        -- 3. Rysujemy kształt przycinania NA TYMCZASOWYM surface
+        -- Uwaga: Tutaj rysujemy od (0,0), bo to lokalny surface
+        create_avatar_path(cr_temp, 0, 0, size, shape)
+        cairo_clip(cr_temp)
+
+        -- 4. Skalujemy i rysujemy surowy obrazek na tymczasowy obszar
+        local w = cairo_image_surface_get_width(raw_image)
+        local h = cairo_image_surface_get_height(raw_image)
+        local scale = math.max(size / w, size / h)
+        
+        local trans_x = (size - (w * scale)) / 2
+        local trans_y = (size - (h * scale)) / 2
+        
+        cairo_translate(cr_temp, trans_x, trans_y)
+        cairo_scale(cr_temp, scale, scale)
+        cairo_set_source_surface(cr_temp, raw_image, 0, 0)
+        cairo_paint(cr_temp)
+        
+        cairo_destroy(cr_temp)
+
+        -- 5. Zapisujemy do cache
+        AVATAR_SURFACE_CACHE[cache_key] = final_surf
+
+        -- 6. Rysujemy finalne (pierwszy raz)
+        cairo_set_source_surface(cr, final_surf, x, y)
+        cairo_paint_with_alpha(cr, AVATAR_ALPHA or 1.0)
+    end
+    -- === OPTYMALIZACJA ZUPIX: KONIEC ===
     
     if DRAW_AVATAR_BORDER then
         create_avatar_path(cr, x, y, size, shape)
@@ -2588,11 +2780,12 @@ local function draw_avatar_local(cr, mail_from_raw, x, y, size)
             cairo_stroke(cr)
         end
     end
-
-    cairo_restore(cr)
 end
 
 -- ====================================================================================
+
+-- Trigger for "FORCE WAKE UP" (Watchdog)
+local last_force_wake_time = 0
 
 local function _conky_draw_mail_indicator_impl()
     if conky_window == nil then return end
@@ -2620,14 +2813,42 @@ local function _conky_draw_mail_indicator_impl()
     
     --- OSTATECZNA POPRAWKA v5 START (ZMIANA 3/4) ---
     -- ==================================================================
-    -- === CENTRALNA LOGIKA CZASU I STANU                             ===
+    -- === CENTRALNA LOGIKA CZASU I STANU (OPTYMALIZACJA) ===
     -- ==================================================================
+    is_animation_running = false -- Reset flagi na starcie klatki
+
+    -- 0. Sprawdź, czy dane (plik) się zmieniły (Nowy Mail?)
+    local data_changed = false
+    -- [OPTYMALIZACJA RAM] Usunięto ograniczenie czasowe. Sprawdzamy co klatkę.
     
+    local raw_data_check = read_file_content("/dev/shm/conky-automail-suite/mail_cache.json") or ""
+    
+    -- [FIX CRITICAL] Tylko sprawdzamy różnicę, NIE AKTUALIZUJEMY statusu tutaj!
+    -- Aktualizację zrobi funkcja fetch_mails_from_cache po udanym odczycie.
+    if raw_data_check ~= last_mail_cache_raw then 
+        data_changed = true 
+    end
+    
+    last_force_wake_time = now
+
     -- 1. Sprawdź, czy użytkownik właśnie przewinął listę (jedyny dowód aktywności)
     local SCROLL_ACTIVE_FLAG_FILE = "/dev/shm/conky-automail-suite/scroll.active"
+    local scroll_active_flag = false
+    
+    -- Najpierw sprawdź, czy plik istnieje (bardzo szybka operacja)
     if file_exists(SCROLL_ACTIVE_FLAG_FILE) then
+        scroll_active_flag = true
         mail_widget_state.last_user_interaction_time = now
+        
+        -- !!! WAŻNE: Wczytujemy nowy offset z dysku do RAM tylko po kliknięciu !!!
+        sync_scroll_offset_from_disk()
+        
         os.remove(SCROLL_ACTIVE_FLAG_FILE)
+    end
+    
+    -- Przy pierwszym starcie skryptu też musimy raz wczytać
+    if is_first_run_of_script then
+        sync_scroll_offset_from_disk()
     end
     
     -- 2. Sprawdź, czy nastąpił timeout od ostatniej akcji użytkownika
@@ -2644,7 +2865,33 @@ local function _conky_draw_mail_indicator_impl()
             print("[INFO] Wykryto ręczny trigger przewijania.")
             force_scroll_active = true
             os.remove(FORCE_SCROLL_TRIGGER_FILE)
+            mail_widget_state.last_user_interaction_time = now
         end
+    end
+
+    local user_interacting = (now - mail_widget_state.last_user_interaction_time) < SCROLL_TIMEOUT
+
+    -- === DECYZJA O TRYBIE RENDEROWANIA ===
+    if data_changed or force_scroll_active or scroll_active_flag or is_first_run_of_script or user_interacting then
+        RENDER_MODE = "active"
+        last_active_render_time = now
+    else
+        -- Check if grace period passed
+        if (now - last_active_render_time) > RENDER_IDLE_AFTER then
+            RENDER_MODE = "idle"
+        else
+            RENDER_MODE = "active"
+        end
+    end
+
+    -- [WAŻNE] Watchdog dla sekundnika ("15s temu")
+    -- Musimy wymusić odświeżanie co 5 sekund, żeby sprawdzić, czy któryś mail nie wymaga aktualizacji czasu
+    if (now - last_buffer_update_time) > 5 then
+        RENDER_MODE = "active"
+    end
+    -- Dodatkowo: jeśli bufor jest stary/zły rozmiar -> active
+    if static_buffer_surface and (cairo_image_surface_get_width(static_buffer_surface) ~= conky_window.width or cairo_image_surface_get_height(static_buffer_surface) ~= conky_window.height) then
+        RENDER_MODE = "active"
     end
     --- OSTATECZNA POPRAWKA v5 KONIEC ---
 
@@ -2656,9 +2903,36 @@ local function _conky_draw_mail_indicator_impl()
         meta_scroll_states = {}
     end
 
+    -- ==========================================================
+    -- === TRYB IDLE: Rysuj z bufora (Zero CPU) ===
+    -- ==========================================================
+    if RENDER_MODE == "idle" and static_buffer_surface then
+        local win_cs = cairo_xlib_surface_create(conky_window.display,
+                                             conky_window.drawable,
+                                             conky_window.visual,
+                                             conky_window.width,
+                                             conky_window.height)
+        local win_cr = cairo_create(win_cs)
+        cairo_set_source_surface(win_cr, static_buffer_surface, 0, 0)
+        cairo_paint(win_cr)
+        cairo_destroy(win_cr)
+        cairo_surface_destroy(win_cs)
+        return -- KONIEC KLATKI (Reszta kodu się nie wykonuje)
+    end
+    -- ==========================================================
+
+
     set_layout_by_mode()
 
-    local data = fetch_mails_from_cache()
+    -- [BUFOROWANIE] Zamiast rysować bezpośrednio na okno, rysujemy na tymczasową powierzchnię
+    local temp_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, conky_window.width, conky_window.height)
+    local cr = cairo_create(temp_surface)
+
+
+    -- [FIX CRITICAL] Przekazujemy flagę data_changed do funkcji loadera
+    -- Jeśli dane się zmieniły, loader MUSI je wczytać, ignorując swój wewnętrzny timer.
+    local data = fetch_mails_from_cache(data_changed)
+    
     local unread      = tonumber(data.unread) or 0
     local all         = tonumber(data.all) or unread
     local unread_cache = tonumber(data.unread_cache) or 0
@@ -2702,6 +2976,13 @@ local function _conky_draw_mail_indicator_impl()
         
         local current_uid = mail.uid or ((mail.subject or "") .. (mail.from or ""))
         local is_genuinely_new_flag = not previously_known_uids[current_uid]
+
+        -- [FIX ZAMRAŻANIA CZASU]
+        -- Jeśli którykolwiek mail jest "świeży" (np. 15s temu), wymuś tryb aktywny na następną klatkę.
+        -- Sprawdzamy różnicę czasu. Jeśli < 60s -> animuj (nie śpij).
+        if mail.timestamp and (now - tonumber(mail.timestamp) < 60) then
+            is_animation_running = true 
+        end
         
         table.insert(last_good_mails, {
             from=from,
@@ -2823,13 +3104,6 @@ local function _conky_draw_mail_indicator_impl()
             if not visible_mail_ids[id] then meta_scroll_states[id] = nil end
         end
     end
-
-    local cs = cairo_xlib_surface_create(conky_window.display,
-                                         conky_window.drawable,
-                                         conky_window.visual,
-                                         conky_window.width,
-                                         conky_window.height)
-    local cr = cairo_create(cs)
     
     draw_main_background(cr)
     
@@ -3147,6 +3421,21 @@ local function _conky_draw_mail_indicator_impl()
     
     if not are_tables_equal(current_uids, previously_known_uids) then
         save_previously_known_uids(current_uids)
+
+        -- [[ OPTYMALIZACJA ZUPIX ]]
+        -- Skoro lista maili się zmieniła, czyścimy cache avatarów, 
+        -- żeby zwolnić pamięć i pozwolić wygenerować nowe.
+        for key, surf in pairs(AVATAR_SURFACE_CACHE) do
+            cairo_surface_destroy(surf)
+        end
+        AVATAR_SURFACE_CACHE = {}
+        
+        -- Czyścimy też cache ikon (bo może przyszły maile bez spinaczy lub z innymi ikonami i stare są zbędne, choć to opcjonalne)
+        for key, surf in pairs(ICON_SURFACE_CACHE) do
+            cairo_surface_destroy(surf)
+        end
+        ICON_SURFACE_CACHE = {}
+        -- [[ KONIEC ]]
     end
     previously_known_uids = current_uids
     
@@ -3178,8 +3467,34 @@ local function _conky_draw_mail_indicator_impl()
     -- [[ POPRAWKA PRZEWIJANIA v2 ]] Na sam koniec, wyłącz flagę pierwszego uruchomienia.
     is_first_run_of_script = false
 
+    -- === PRZENIESIENIE OBRAZU DO OKNA CONKY ===
+    local win_cs = cairo_xlib_surface_create(conky_window.display,
+                                             conky_window.drawable,
+                                             conky_window.visual,
+                                             conky_window.width,
+                                             conky_window.height)
+    local win_cr = cairo_create(win_cs)
+    cairo_set_source_surface(win_cr, temp_surface, 0, 0)
+    cairo_paint(win_cr)
+    cairo_destroy(win_cr)
+    cairo_surface_destroy(win_cs)
+
+    -- === UPDATE STANU AKTYWNOŚCI ===
+    if is_animation_running then
+        last_active_render_time = now
+    end
+
+    -- === SNAPSHOT DO BUFORA DLA NASTĘPNEJ KLATKI ===
+    -- Jeśli animacja się skończyła (nie ma ruchu), zapiszmy obecny stan
+    -- jako statyczny bufor, aby w następnej klatce (jeśli nadal będzie cisza) użyć go i nie liczyć wszystkiego od nowa.
+    if not is_animation_running then
+        if static_buffer_surface then cairo_surface_destroy(static_buffer_surface) end
+        static_buffer_surface = cairo_surface_reference(temp_surface)
+        last_buffer_update_time = now
+    end
+
     cairo_destroy(cr)
-    cairo_surface_destroy(cs)
+    cairo_surface_destroy(temp_surface)
 end
 
 function conky_draw_mail_indicator()

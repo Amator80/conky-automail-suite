@@ -9,6 +9,7 @@
 #  - [UPDATE] KLUCZ SZYFRUJĄCY W KATALOGU UŻYTKOWNIKA (BEZPIECZEŃSTWO)
 #  - [MOD] GEOIP W TLE (ASYNC WORKER)
 #  - [FIX] LIVE UPDATE DANYCH GEOGRAFICZNYCH
+#  - [FIX] DATA OTRZYMANIA ZAMIAST DATY WYSŁANIA (WP FIX)
 # ==========================================================
 import ipaddress
 import imaplib
@@ -1146,6 +1147,25 @@ def _imap_batch_fetch_uid(imap_conn, uids, chunk=IMAP_BATCH_CHUNK, diag=None):
 #                                   BUDOWANIE REKORDU MAILA
 # ===============================================================
 
+def get_best_timestamp_str(msg):
+    """
+    Próbuje pobrać datę z nagłówka 'Received' (czas dotarcia),
+    ponieważ 'Date' często pokazuje czas wysłania (nawet godziny wcześniej).
+    """
+    received = msg.get_all("Received", [])
+    if received:
+        # Zazwyczaj pierwszy Received od góry to ten serwera docelowego
+        top_header = received[0]
+        if ";" in top_header:
+            try:
+                # Data jest po średniku, np: "from ...; Tue, 23 Dec..."
+                candidate = top_header.split(";")[-1].strip()
+                return candidate
+            except Exception:
+                pass
+    # Fallback do zwykłej daty nadania, jeśli nie udało się odczytać Received
+    return msg.get("Date", "")
+
 def _build_mail_entry(raw_msg, preview_lines, sort_preview, include_meta, do_geoip, geoip_cache_path, diag=None):
     t_parse0 = time.perf_counter()
     msg = BytesParser(policy=policy.default).parsebytes(raw_msg)
@@ -1155,7 +1175,9 @@ def _build_mail_entry(raw_msg, preview_lines, sort_preview, include_meta, do_geo
 
     raw_from = msg.get("From", "")
     raw_subject = msg.get("Subject", "")
-    raw_date = msg.get("Date", "")
+    
+    # [ZMIANA] Używamy nowej funkcji zamiast msg.get("Date")
+    raw_date = get_best_timestamp_str(msg)
 
     subject = decode_mime_header(raw_subject)
     from_addr = decode_mime_header(raw_from)
