@@ -38,10 +38,10 @@ def decrypt_password(encrypted_pass):
         return encrypted_pass
 
     try:
-        # Wywołanie openssl identyczne jak w skryptach Bash
+        # Wywołanie openssl z parametrem -iter 100000 (ZMIANA)
         result = subprocess.run(
             ['openssl', 'enc', '-d', '-aes-256-cbc', 
-             '-salt', '-pbkdf2', 
+             '-salt', '-pbkdf2', '-iter', '100000', 
              '-pass', f'file:{SECRET_KEY_PATH}', 
              '-a', '-A'],
             input=encrypted_pass.encode('utf-8'),

@@ -1,5 +1,6 @@
 #!/bin/bash
-# 1.Instalacja_zależności_v2.sh (v2.0 - Merged: No VENV + System Fixes + YAD)
+# 1.Instalacja_zależności.sh (v2.0 - Yad Support/No Venv)
+# Fix dla openMandriva w sekcji nr. 4 - Usuwanie zamiennika zenity `qarma` psującego działanie skryptu.
 
 # ==========================================
 # 1. KONFIGURACJA ZMIENNYCH
@@ -15,7 +16,7 @@ START_SOUND="$SOUND_FOLDER/start_notification_1.wav"
 play_start_sound() {
   if [[ -f "$START_SOUND" ]]; then
     if command -v paplay &> /dev/null; then
-      # Poprawka: ukrycie błędów connection refused
+      # Dodano >/dev/null 2>&1 aby ukryć błędy Connection refused na Gentoo/ALSA
       paplay "$START_SOUND" >/dev/null 2>&1 & 
     elif command -v aplay &> /dev/null; then
       aplay -q "$START_SOUND" >/dev/null 2>&1 &
@@ -52,10 +53,10 @@ fi
 
 
 # ==========================================
-# 2. OBSŁUGA TERMINALA (POPRAWIONA)
+# 2. OBSŁUGA TERMINALA
 # ==========================================
 
-# --- Wybór emulatora terminala ---
+# --- Wybór emulatora terminala (nie używamy systemowej zmiennej TERM) ---
 TERMINALS=(gnome-terminal xfce4-terminal konsole tilix mate-terminal x-terminal-emulator xterm)
 TERM_CMD=""
 for t in "${TERMINALS[@]}"; do
@@ -70,11 +71,11 @@ open_in_terminal_async() {
     if [ "$HOLD" = "1" ]; then
         HOLD_TAIL="; echo; echo '--- Instalacja zakończona. Naciśnij Enter, aby zamknąć terminal ---'; read -r _"
     fi
-    case "$TERM_CMD" in
+case "$TERM_CMD" in
         gnome-terminal)       gnome-terminal --wait -- bash -lc "$CMD$HOLD_TAIL" & ;;
-        # POPRAWKA OD KOLEGI: dodano --disable-server dla XFCE
+        # DODANO --disable-server
         xfce4-terminal)       xfce4-terminal --disable-server --command "bash -lc \"$CMD$HOLD_TAIL\"" & ;;
-        # POPRAWKA OD KOLEGI: dodano --nofork dla Konsole
+        # DODANO --nofork
         konsole)              konsole --nofork -e bash -lc "$CMD$HOLD_TAIL" & ;;
         tilix)                tilix -- bash -lc "$CMD$HOLD_TAIL" & ;;
         mate-terminal)        mate-terminal --disable-factory -- bash -lc "$CMD$HOLD_TAIL" & ;;
@@ -98,20 +99,21 @@ open_terminal_blank() {
 # 3. DETEKCJA PAKIETÓW
 # ==========================================
 
+# --- Detekcja pakietów (per menedżer pakietów) ---
 is_pkg_installed() {
     local pkg="$1"
 
+    # Jeśli nie znamy PM, zakładamy, że pakiet nie jest zainstalowany (wymusi wejście do pętli)
     if [ "$UNKNOWN_PM" == "1" ]; then
         return 1
     fi
 
-    # Poprawka: ignorujemy sprawdzenie command -v dla python-ensurepip (jeśli występuje)
-    if [[ "$pkg" != "python-ensurepip" ]]; then
-        if command -v "${pkg%%-*}" &>/dev/null; then
-            return 0
-        fi
+    # Sprawdzenie czy binary istnieje (dla większości pakietów to wystarczy)
+    if command -v "${pkg%%-*}" &>/dev/null; then
+        return 0
     fi
 
+    # Sprawdzenie w menedżerze pakietów
     case "$PM" in
         apt-get) dpkg -s "$pkg" &>/dev/null ;;
         pacman)  pacman -Q "$pkg" &>/dev/null ;;
@@ -122,31 +124,56 @@ is_pkg_installed() {
     esac
 }
 
-
 # ==========================================
 # 4. TRYB AWARYJNY: BRAK ZENITY
 # ==========================================
 
-if ! command -v zenity &>/dev/null; then
+# --- Funkcja sprawdzająca poprawność instalacji Zenity ---
+# Naprawia problem OpenMandriva (gdzie 'zenity' to wrapper, a GUI jest w 'zenity-gtk')
+check_zenity_status() {
+    # 1. Podstawowe sprawdzenie czy polecenie istnieje
+    if ! command -v zenity &>/dev/null; then
+        return 1
+    fi
+
+# 2. Specjalny wyjątek dla OpenMandriva
+    if [ -f /etc/openmandriva-release ] || grep -qi "OpenMandriva" /etc/os-release 2>/dev/null; then
+        if command -v rpm &>/dev/null; then
+            # POPRAWKA: Jeśli qarma jest w systemie, wymuszamy błąd (reinstalację)
+            if rpm -q qarma &>/dev/null; then return 1; fi
+            
+            # Sprawdzenie obecności zenity-gtk
+            rpm -q zenity-gtk &>/dev/null || return 1
+        fi
+    fi
+    
+    return 0
+}
+
+# --- TRYB AWARYJNY: Zenity nie jest zainstalowane LUB jest niekompletne (OpenMandriva) ---
+if ! check_zenity_status; then
     if [[ "$ZENITY_INSTALLED_ONCE" == "1" ]]; then
         echo "🔁 Skrypt już próbował zainstalować zenity. Uruchom go ponownie, jeśli instalacja się powiodła."
         exit 1
     fi
     export ZENITY_INSTALLED_ONCE=1
 
+    # Prosta detekcja dystrybucji bez zenity
     DISTRO=""
     if command -v lsb_release &>/dev/null; then
         DISTRO=$(lsb_release -is 2>/dev/null)
     fi
     [ -z "$DISTRO" ] && DISTRO="ask"
 
+    # Przygotuj polecenia pre-update i instalacji dla znanych rodzin
     case "$(echo "$DISTRO" | tr '[:upper:]' '[:lower:]')" in
         arch*|manjaro*|garuda*|endeavouros|artix)
             PRE_CMD="sudo pacman -Sy"
             INSTALL_CMD="sudo pacman -S --noconfirm zenity gtk4 libadwaita"
             ;;
-        openmandriva*)
-            PRE_CMD="sudo dnf makecache"
+		openmandriva*)
+            # POPRAWKA: Usuwamy qarma przed odświeżeniem cache
+            PRE_CMD="sudo dnf remove -y qarma; sudo dnf makecache"
             INSTALL_CMD="sudo dnf install -y zenity-gtk"
             ;;
         mageia*)
@@ -173,8 +200,8 @@ if ! command -v zenity &>/dev/null; then
             open_in_terminal_async "echo 'Na NixOS dołącz zenity w configuration.nix (environment.systemPackages).' ; echo ; echo 'Przykład: environment.systemPackages = with pkgs; [ zenity ];' ; echo ; read -r -p 'Naciśnij Enter, aby zamknąć...'"
             exit 1
             ;;
-gentoo*)
-            # POPRAWKA OD KOLEGI: Lepsza pętla dla Gentoo
+        gentoo*)
+            # Dedykowana pętla dla Gentoo
             RUN_GENTOO='
                 FIRST_RUN=1
                 while ! command -v zenity &>/dev/null; do
@@ -187,27 +214,37 @@ gentoo*)
                     echo -e "Proszę otworzyć nowy terminal i wykonać:"
                     echo -e "\033[1msudo emerge -av gnome-extra/zenity\033[0m"
                     echo
+
                     if [ "$FIRST_RUN" -eq 0 ]; then
                         echo -e "\033[1;31m❌ Nadal nie wykryto zenity. Sprawdź, czy instalacja zakończyła się sukcesem.\033[0m"
                         echo
                     fi
+
                     echo "Gdy instalacja się zakończy, wróć tutaj."
                     read -rp "Naciśnij Enter, aby sprawdzić ponownie obecność zenity..." _
+                    
                     FIRST_RUN=0
                     hash -r 2>/dev/null
                 done
                 echo -e "\033[1;32m✅ Zenity wykryte! Uruchamiam instalator...\033[0m"
                 sleep 1
             '
+            # Uruchamiamy terminal
             pid=$(open_in_terminal_async "bash -c $(printf %q "$RUN_GENTOO")" 0)
+            
+            # WYŁĄCZAMY TRAP, żeby "command -v" zwracający błąd nie zabił skryptu
             trap - ERR
+
+            # Pętla działa dopóki proces terminala żyje
             while kill -0 "$pid" 2>/dev/null; do
                 hash -r 2>/dev/null
-                if command -v zenity &>/dev/null; then break; fi
+                # Używamy nowej funkcji check_zenity_status zamiast command -v
+                if check_zenity_status; then break; fi
                 sleep 1
             done
+            
             hash -r 2>/dev/null
-            if command -v zenity &>/dev/null; then 
+            if check_zenity_status; then 
                 exec env ZENITY_INSTALLED_ONCE=1 "$0" "$@"
             else
                 exit 1
@@ -219,8 +256,10 @@ gentoo*)
             ;;
     esac
 
+    # Jeżeli nie mamy pewnej nazwy dystrybucji, poproś użytkownika o wybór w terminalu
     if [ "$DISTRO" = "ask" ]; then
         RUN_IN_TERM='
+            # UWAGA: bez "set -e"
             echo; echo "Brakuje wymaganego programu ZENITY."; echo
             echo "Wybierz swoją dystrybucję:"
             echo "  1) Debian/Ubuntu/Mint"
@@ -238,7 +277,7 @@ gentoo*)
                 3) PRE_CMD="sudo dnf makecache";     INSTALL_CMD="sudo dnf install -y zenity";;
                 4) PRE_CMD="sudo zypper refresh";    INSTALL_CMD="sudo zypper install -y zenity";;
                 5) PRE_CMD="sudo eopkg update-repo"; INSTALL_CMD="sudo eopkg install zenity";;
-                6) PRE_CMD="sudo dnf makecache";     INSTALL_CMD="sudo dnf install -y zenity-gtk";;
+				6) PRE_CMD="sudo dnf remove -y qarma; sudo dnf makecache"; INSTALL_CMD="sudo dnf install -y zenity-gtk";;
                 7) PRE_CMD="su -c \"dnf makecache\""; INSTALL_CMD="su -c \"dnf install -y zenity\"";;
                 8) 
                    echo; echo -e "\033[0;35m\033[1m💜 Gentoo: Instalacja ręczna 💜\033[0m"
@@ -251,6 +290,7 @@ gentoo*)
                 *) PRE_CMD="sudo apt-get update";    INSTALL_CMD="sudo apt-get install -y zenity";;
             esac
             
+            # Jeśli wybrano standardową dystrybucję (nie Gentoo/8), wykonaj instalację
             if [ "$CH" != "8" ]; then
                 echo; echo "Brakuje wymaganego programu ZENITY."; echo "W nowym oknie terminala zostanie uruchomione polecenie:"; echo
                 echo "    ${PRE_CMD} ; ${INSTALL_CMD}"; echo
@@ -261,16 +301,29 @@ gentoo*)
         '
         pid=$(open_in_terminal_async "bash -lc $(printf %q "$RUN_IN_TERM")" 0)
         for _ in $(seq 1 600); do
-            if command -v zenity &>/dev/null; then exec env ZENITY_INSTALLED_ONCE=1 "$0" "$@"; fi
+            # Używamy check_zenity_status, aby nie przeładować skryptu zbyt wcześnie na OM
+            if check_zenity_status; then exec env ZENITY_INSTALLED_ONCE=1 "$0" "$@"; fi
             if ! kill -0 "$pid" 2>/dev/null; then break; fi
             sleep 1
         done
-        if command -v zenity &>/dev/null; then exec env ZENITY_INSTALLED_ONCE=1 "$0" "$@"; fi
+        if check_zenity_status; then exec env ZENITY_INSTALLED_ONCE=1 "$0" "$@"; fi
         exit 0
     fi
 
+# Normalna ścieżka: znamy dystrybucję (i nie jest to Gentoo)
+    # 1. Domyślny komunikat
+    MSG_HEADER="Brakuje wymaganego programu ZENITY - (GUI)."
+
+    # 2. Sprawdzenie czy mamy do czynienia z qarmą (OpenMandriva)
+    # Jeśli rpm istnieje i pakiet qarma jest zainstalowany -> zmieniamy komunikat
+    if command -v rpm &>/dev/null && rpm -q qarma &>/dev/null; then
+        MSG_HEADER="Brakuje wymaganego programu ZENITY - (GUI).\n\nSpecjalny wyjątek dla OpenMandriva:\nUsuwanie zamiennika zenity 'qarma', który psuje skrypt + instalacja pełnego 'zenity-gtk'."
+    fi
+
+    # 3. Uruchomienie z dynamicznym komunikatem
+    # Używamy echo -e, aby obsłużyć znaki nowej linii \n w komunikacie specjalnym
     RUN_IN_TERM="
-        echo; echo 'Brakuje wymaganego programu ZENITY - (GUI).'; echo 'Zostanie uruchomione następujące polecenie instalacyjne:'; echo
+        echo; echo -e '$MSG_HEADER'; echo; echo 'Zostanie uruchomione następujące polecenie instalacyjne:'; echo
         echo '    ${PRE_CMD} ; ${INSTALL_CMD}'; echo
         read -rp 'Naciśnij Enter, aby rozpocząć instalację...' _
         ${PRE_CMD} ; ${INSTALL_CMD}
@@ -278,11 +331,12 @@ gentoo*)
     "
     pid=$(open_in_terminal_async "bash -lc $(printf %q "$RUN_IN_TERM")" 0)
     for _ in $(seq 1 600); do
-        if command -v zenity &>/dev/null; then exec env ZENITY_INSTALLED_ONCE=1 "$0" "$@"; fi
+        # Używamy check_zenity_status, aby upewnić się, że zenity-gtk faktycznie już jest
+        if check_zenity_status; then exec env ZENITY_INSTALLED_ONCE=1 "$0" "$@"; fi
         if ! kill -0 "$pid" 2>/dev/null; then break; fi
         sleep 1
     done
-    if command -v zenity &>/dev/null; then exec env ZENITY_INSTALLED_ONCE=1 "$0" "$@"; fi
+    if check_zenity_status; then exec env ZENITY_INSTALLED_ONCE=1 "$0" "$@"; fi
     exit 0
 fi
 
@@ -290,6 +344,7 @@ fi
 # 5. WYKRYWANIE DYSTRYBUCJI
 # ==========================================
 
+# --- Wykrywanie dystrybucji ---
 if ! command -v lsb_release &>/dev/null; then
     zenity --warning --width=480 --text="❗ <b>Nie znaleziono polecenia <tt>lsb_release</tt> w systemie.</b>\n\nTo polecenie służy do automatycznego wykrywania wersji systemu Linux przez skrypt.\n\nW kolejnym kroku <b>musisz wybrać ręcznie swoją dystrybucję z listy</b>.\n\nJeśli nie ma jej na liście, wybierz opcję 'Brak systemu na liście'."
     [ $? -ne 0 ] && error_exit "Użytkownik anulował wybór dystrybucji lub zamknął okno ostrzeżenia." "LSB_RELEASE"
@@ -333,7 +388,7 @@ if ! command -v notify-send &>/dev/null; then
         mageia*)                                  PKG_NOTIFY="libnotify";       INSTALL_NOTIFY="su -c 'dnf install -y libnotify'" ;;
         nixos) error_exit "Na NixOS zainstaluj notify-send przez configuration.nix" "notify-send" ;;
         gentoo*)
-            # POPRAWKA OD KOLEGI: Dedykowana pętla dla Gentoo dla notify-send
+            # Dedykowana pętla dla Gentoo dla notify-send (analogiczna do Zenity)
             RUN_GENTOO_NOTIFY='
                 FIRST_RUN=1
                 while ! command -v notify-send &>/dev/null; do
@@ -346,29 +401,39 @@ if ! command -v notify-send &>/dev/null; then
                     echo -e "Proszę otworzyć nowy terminal i wykonać:"
                     echo -e "\033[1msudo emerge -av x11-libs/libnotify\033[0m"
                     echo
+
                     if [ "$FIRST_RUN" -eq 0 ]; then
                         echo -e "\033[1;31m❌ Nadal nie wykryto notify-send. Sprawdź przebieg instalacji.\033[0m"
                         echo
                     fi
+
                     echo "Gdy instalacja się zakończy, wróć tutaj."
                     read -rp "Naciśnij Enter, aby sprawdzić ponownie..." _
+                    
                     FIRST_RUN=0
                     hash -r 2>/dev/null
                 done
                 echo -e "\033[1;32m✅ notify-send wykryte! Restartuję skrypt...\033[0m"
                 sleep 1
             '
+            # Uruchamiamy terminal z instrukcją
             pid=$(open_in_terminal_async "bash -c $(printf %q "$RUN_GENTOO_NOTIFY")" 0)
+            
+            # Wyłączamy trap na błędy, bo command -v notify-send zwróci błąd dopóki nie zainstalujemy
             trap - ERR
+
+            # Pętla oczekiwania w głównym skrypcie
             while kill -0 "$pid" 2>/dev/null; do
                 hash -r 2>/dev/null
                 if command -v notify-send &>/dev/null; then break; fi
                 sleep 1
             done
+            
             hash -r 2>/dev/null
             if command -v notify-send &>/dev/null; then
                 exec "$0" "$@"
             else
+                # Jeśli użytkownik zamknął okno bez instalacji -> błąd
                 zenity --error --text="Wymagane narzędzie notify-send nie zostało zainstalowane."
                 exit 1
             fi
@@ -376,6 +441,9 @@ if ! command -v notify-send &>/dev/null; then
         *)     PKG_NOTIFY="libnotify-bin";        INSTALL_NOTIFY="sudo apt-get install -y $PKG_NOTIFY" ;;
     esac
 
+    # --- Poniższy kod wykonuje się TYLKO dla standardowych dystrybucji (nie Gentoo/NixOS) ---
+    # Ponieważ Gentoo i NixOS mają swoje "exit" lub "exec" wewnątrz case, nie dotrą tutaj.
+    
     trap - ERR
     zenity --question \
         --width=560 \
@@ -409,16 +477,16 @@ fi
 
 
 # ==========================================
-# 7. KONFIGURACJA MENEDŻERA PAKIETÓW (MOD Z DODANYM YAD + NO VENV)
+# 7. KONFIGURACJA MENEDŻERA PAKIETÓW
 # ==========================================
 
 UNKNOWN_PM=0
 
+# --- Mapa dystrybucji -> PM i pakiety ---
 case "$DISTRO" in
   linuxmint|"linux mint"|mint)
     PM="apt-get"; INSTALL="sudo $PM install -y"; PREINSTALL_CMD="sudo apt-get update"
     MAJOR_VER=$(echo "$VERSION" | cut -d. -f1 | tr -d '[:space:]')
-    # Dodano yad do list
     if [[ "$MAJOR_VER" == "21" || "$MAJOR_VER" == "22" ]]; then
       REQUIRED_PACKAGES=(conky-all wget lua5.4 liblua5.4-dev jq fonts-noto-color-emoji yad)
     else
@@ -427,7 +495,6 @@ case "$DISTRO" in
     ;;
   ubuntu)
     PM="apt-get"; INSTALL="sudo $PM install -y"; PREINSTALL_CMD="sudo apt-get update"
-    # Dodano yad
     REQUIRED_PACKAGES=(conky-all wget jq fonts-noto-color-emoji yad)
     if [[ "$VERSION" =~ ^22(\.|$) || "$VERSION" =~ ^24(\.|$) ]]; then
       REQUIRED_PACKAGES+=(lua5.4 liblua5.4-dev)
@@ -437,7 +504,6 @@ case "$DISTRO" in
     ;;
   debian)
     PM="apt-get"; INSTALL="sudo $PM install -y"; PREINSTALL_CMD="sudo apt-get update"
-    # Dodano yad
     REQUIRED_PACKAGES=(conky-all wget jq fonts-noto-color-emoji yad)
     if [[ "$VERSION" =~ ^(11|12|13)(\.|$) ]]; then
       REQUIRED_PACKAGES+=(lua5.4 liblua5.4-dev)
@@ -448,37 +514,45 @@ case "$DISTRO" in
   fedora)
     PM="dnf"; INSTALL="sudo $PM install -y"; PREINSTALL_CMD="sudo dnf makecache"
     if dnf list texlive-noto-emoji &>/dev/null; then EMOJI_PKG="texlive-noto-emoji"; else EMOJI_PKG="google-noto-emoji-color-fonts"; fi
-    # Dodano yad
     REQUIRED_PACKAGES=(conky wget lua lua-devel jq "$EMOJI_PKG" yad)
     ;;
-  openmandriva*)
-    # --- POPRAWKA OD KOLEGI: Lepsze wykrywanie OpenMandriva (Rome vs Rock) ---
+openmandriva*)
+    # Pobieramy nazwę kodową (np. 'rome' lub 'vanadium')
     OM_CODENAME=$(lsb_release -cs 2>/dev/null | tr '[:upper:]' '[:lower:]')
     
     # === WARIANT 1: OpenMandriva ROME (Rolling) ===
     if [[ "$OM_CODENAME" == "rome" ]] || [[ "$OM_CODENAME" == "rolling" ]]; then
         PM="dnf"
         PREINSTALL_CMD="sudo dnf clean all; sudo dnf makecache"
-        # Dodano yad, usunięto python-ensurepip (bo NO VENV)
         REQUIRED_PACKAGES=(conky wget lua jq zenity-gtk fonts-ttf-noto-emoji yad)
         
+        # --- NOWOŚĆ: Sprawdzamy, czy conky jest już zainstalowany ---
         if rpm -q conky &>/dev/null; then
+            # Pakiet jest już w systemie - pomijamy konfigurację repozytoriów
+            # Ustawiamy standardową komendę instalacji dla pozostałych brakujących pakietów
             INSTALL="sudo $PM install -y"
         else
+            # Pakietu NIE MA - musimy upewnić się, że repozytorium 'extra' jest dostępne
             REPO_ACTIVE=0
             IS_RETRY=0 
+    
             while [ $REPO_ACTIVE -eq 0 ]; do
+                # Sprawdzenie czy repo jest włączone
                 if dnf repolist | grep -q "rolling-x86_64-extra"; then
                     REPO_ACTIVE=1
                     INSTALL="sudo $PM install -y"
                     break
                 fi
+    
+                # DEFINIOWANIE TREŚCI KOMUNIKATU
                 if [ $IS_RETRY -eq 0 ]; then
                     HEADER_MSG="ℹ️ <big><b>Wymagane repozytorium 'Extra' jest wyłączone.</b></big>"
                 else
                     HEADER_MSG="<span foreground='red'>⛔ <big><big><b>Wymagane repozytorium 'Extra' jest NADAL wyłączone!</b></big></big></span>"
                 fi
+    
                 FULL_TEXT="${HEADER_MSG}\n\nPakiet <b>conky</b> znajduje się w repozytorium <tt>rolling-x86_64-extra</tt>.\nAby otrzymywać aktualizacje, zaleca się włączenie go w ustawieniach systemu.\n\nCo chcesz zrobić?"
+    
                 trap - ERR
                 USER_ACTION=$(zenity --question \
                     --width=700 --title="Konfiguracja OpenMandriva Rolling" \
@@ -488,37 +562,85 @@ case "$DISTRO" in
                     --extra-button="Otwórz Software Repository Selector" \
                     --extra-button="Instalacja tymczasowa (Awaryjna)" \
                     --icon-name="dialog-information")
+                
                 RET_CODE=$?
                 trap 'error_exit "Nieoczekiwany błąd w skrypcie!" "trap"' ERR
+    
                 if [ "$USER_ACTION" == "Otwórz Software Repository Selector" ]; then
-                    trap - ERR; om-repo-picker; trap 'error_exit "Nieoczekiwany błąd w skrypcie!" "trap"' ERR
-                    (zenity --info --width=400 --timeout=3 --text="🔄 <b>Odświeżanie bazy pakietów...</b>" || true) &
+                    echo "Uruchamiam om-repo-picker..."
+                    trap - ERR
+                    om-repo-picker
+                    trap 'error_exit "Nieoczekiwany błąd w skrypcie!" "trap"' ERR
+                    
+                    (zenity --info --width=400 --timeout=3 --text="🔄 <b>Odświeżanie bazy pakietów...</b>\n\nProszę czekać, sprawdzam zmiany." || true) &
                     sudo dnf makecache &>/dev/null
                     IS_RETRY=1
+                    
                 elif [ "$USER_ACTION" == "Instalacja tymczasowa (Awaryjna)" ]; then
-                    INSTALL="sudo $PM install -y --enablerepo=rolling-x86_64-extra"
-                    REPO_ACTIVE=1; break
+                    trap - ERR
+                    zenity --question \
+                        --width=600 \
+                        --title="Potwierdzenie instalacji tymczasowej" \
+                        --text="ℹ️ <b>Wybrano tryb instalacji tymczasowej.</b>\n\nSkrypt wymusi instalację pakietu <b>conky</b> korzystając z repozytorium <tt>rolling-x86_64-extra</tt> <b>tylko jednorazowo</b>.\n\n⚠️ <b>Konfiguracja systemu nie zostanie zmieniona na stałe.</b>\nOznacza to, że pakiet conky zainstaluje się poprawnie, ale w przyszłości system może nie wykrywać do niego aktualizacji automatycznie.\n\nCzy chcesz kontynuować?" \
+                        --ok-label="Instaluj" \
+                        --cancel-label="Anuluj" \
+                        --icon-name="dialog-warning"
+                    
+                    TEMP_CONFIRM=$?
+                    trap 'error_exit "Nieoczekiwany błąd w skrypcie!" "trap"' ERR
+                    
+                    if [ $TEMP_CONFIRM -eq 0 ]; then
+                        echo "Wybrano tryb tymczasowy."
+                        INSTALL="sudo $PM install -y --enablerepo=rolling-x86_64-extra"
+                        REPO_ACTIVE=1
+                        break
+                    else
+                        IS_RETRY=1
+                    fi
+                    
                 elif [ $RET_CODE -eq 0 ]; then
                     (zenity --info --width=300 --timeout=2 --text="🔍 Weryfikacja..." || true) &
                     sudo dnf makecache &>/dev/null
                     IS_RETRY=1
+                    
                 else
-                    zenity_info_or_exit "⛔ <b>Przerwano instalację.</b>\n\nUżytkownik anulował wybór repozytorium." 400; exit 0
+                    zenity_info_or_exit "⛔ <b>Przerwano instalację.</b>\n\nUżytkownik anulował wybór repozytorium." 400
+                    exit 0
                 fi
             done
-            if [ -z "$INSTALL" ]; then INSTALL="sudo $PM install -y"; fi
+            
+            # Zabezpieczenie na wypadek wyjścia z pętli bez ustawienia INSTALL
+            if [ -z "$INSTALL" ]; then
+                 INSTALL="sudo $PM install -y"
+            fi
         fi
-    # === WARIANT 2: OpenMandriva ROCK ===
+
+    # === WARIANT 2: OpenMandriva ROCK (np. 6.0 Vanadium) ===
     else
         trap - ERR
+        # Pytamy o zgodę na hybrydową instalację (Rock + pakiet z Rolling)
         zenity --question \
-            --width=550 --title="Ostrzeżenie OpenMandriva Lx" \
-            --text="⚠️ <big><b>Wykryto system OpenMandriva.</b></big>\n\nObecne wersje pakietu <b>conky</b> w oficjalnych repozytoriach stabilnych (Rome/Rock) są uszkodzone (brak obsługi Cairo/Lua).\n\nAby widget działał poprawnie, instalator spróbuje pobrać pakiet <tt>conky</tt> z repozytorium eksperymentalnego <b>cooker/rolling</b>.\n\nCzy zgadzasz się na instalację pakietu z nowszego repozytorium?" \
-            --ok-label="Tak, zgadzam się" --cancel-label="Anuluj" --icon-name="dialog-warning"
-        if [ $? -ne 0 ]; then zenity_info_or_exit "❗ <b>Przerwano instalację.</b>\nUżytkownik nie wyraził zgody na instalację." 400; exit 0; fi
+            --width=550 --title="OpenMandriva Lx (Rock/Vanadium)" \
+            --text="⚠️ <big><b>Wykryto wersję stabilną OpenMandriva (Rock).</b></big>\n\nAby widget działał poprawnie, instalator pobierze nowszą wersję pakietu <tt>conky</tt> (z obsługą Lua/Cairo) korzystając z repozytorium <b>Rolling</b>.\n\nCzy zgadzasz się na tymczasowe pobranie pakietu z nowszego systemu?\n(Nie wpłynie to na stabilność reszty systemu)." \
+            --ok-label="Tak, zgadzam się" --cancel-label="Anuluj" \
+            --icon-name="dialog-warning"
+        
+        if [ $? -ne 0 ]; then 
+            zenity_info_or_exit "❗ <b>Przerwano instalację.</b>\nUżytkownik nie wyraził zgody na instalację z repo Rolling." 400
+            exit 0
+        fi
         trap 'error_exit "Nieoczekiwany błąd w skrypcie!" "trap"' ERR
-        PM="dnf"; INSTALL="sudo $PM install -y"
-        PREINSTALL_CMD="if ! rpm -q conky &>/dev/null; then echo 'Instalacja conky z repo cooker...'; sudo dnf install -y conky --enablerepo=rolling-x86_64,rolling-x86_64-extra; fi; sudo dnf makecache"
+        
+        PM="dnf"
+        INSTALL="sudo $PM install -y"
+        
+        # Instalacja TYMCZASOWA z wykorzystaniem istniejących (ale wyłączonych) repozytoriów Rolling
+        PREINSTALL_CMD="if ! rpm -q conky &>/dev/null; then \
+            echo 'Instalacja conky z repozytorium Rolling (tryb tymczasowy)...'; \
+            sudo dnf install -y conky --enablerepo=rolling-x86_64,rolling-x86_64-extra; \
+        fi; \
+        sudo dnf makecache"
+        
         REQUIRED_PACKAGES=(conky wget lua jq zenity-gtk fonts-ttf-noto-emoji yad)
     fi
     ;;
@@ -552,12 +674,14 @@ case "$DISTRO" in
 gentoo)
     UNKNOWN_PM=1
     GENTOO_MODE=1
-    # Atrapa
+    # Atrapa, żeby wejść do pętli
     REQUIRED_PACKAGES=("manual_action_required")
-    # Tekst dla Gentoo - BEZ VENV, ALE Z YAD
+    
+    # Lista z flagami USE i kategoriami portage
     MY_CUSTOM_TEXT="<b>app-admin/conky</b> - wymagane flagi USE: <b>lua-cairo</b>, <b>lua-cairo-xlib</b>, <b>bundled-toluapp</b> \n<b>dev-lang/lua</b>\n<b>net-misc/wget</b>\n<b>app-misc/jq</b>\n<b>gnome-extra/yad</b>\n<b>media-fonts/noto-emoji</b> (lub inne, np. Google Fonts)"
     ;;
   *)
+    # Fallback: wykryj dostępny menedżer pakietów
     if command -v apt-get &>/dev/null; then
 	  PM="apt-get"; INSTALL="sudo $PM install -y"; PREINSTALL_CMD="sudo apt-get update"
 	  REQUIRED_PACKAGES=(conky-all wget jq fonts-noto-color-emoji yad)
@@ -577,9 +701,11 @@ gentoo)
       PM="eopkg"; INSTALL="sudo $PM install -y"; PREINSTALL_CMD="sudo eopkg update-repo"
       REQUIRED_PACKAGES=(conky wget lua jq font-noto-emoji yad)
     else
+      # --- UNKNOWN PM FALLBACK START ---
       UNKNOWN_PM=1
-      # Lista dla nieznanego PM - dodano YAD
+      # Lista do wyświetlenia w oknie dialogowym, nie do sprawdzania automatem
       REQUIRED_PACKAGES=("<b>conky</b> (z obsługą cairo), <b>lua</b>, <b>wget</b>, <b>jq</b>, <b>yad</b>, <b>fonts-noto-color-emoji</b> (lub podobny pakiet dostarczający kolorową czcionkę \"Color emoji font from Google\")")
+      # --- UNKNOWN PM FALLBACK END ---
     fi
     ;;
 esac
@@ -589,6 +715,7 @@ esac
 # 8. GŁÓWNA PĘTLA INSTALACJI ZALEŻNOŚCI
 # ==========================================
 
+# --- BLOK INSTALACJI ZALEŻNOŚCI ---
 FIRST_MISSING_SCREEN=1
 
 MISSING_ON_START=()
@@ -598,7 +725,9 @@ for pkg in "${REQUIRED_PACKAGES[@]}"; do
     fi
 done
 
+# Funkcja obsługująca tryb ręczny z dodatkowym przyciskiem
 manual_install_loop() {
+    # ... (FUNKCJA BEZ ZMIAN) ...
     local CMD="$1"
     local PKG_TXT="$2"
     while :; do
@@ -620,7 +749,7 @@ manual_install_loop() {
             open_terminal_blank; sleep 0.3; continue
         elif [ "$RESP" = "Nie sprawdzaj zależności" ]; then
             trap - ERR
-            if zenity --question --width=550 --title="Potwierdzenie pominięcia" --text="<big>⚠️ <b>Czy na pewno chcesz pominąć sprawdzanie zależności?</b></big>\n\n<span foreground='red'>Pominięcie tego kroku oznacza, że skrypt nie zweryfikuje, czy wymagane pakiety są zainstalowane.</span>\n\nJeśli ich brakuje, widżet nie uruchomi się poprawnie lub wystąpią błędy.\n\nCzy jesteś świadomy ryzyka i chcesz kontynuować?"; then
+            if zenity --question --width=550 --title="Potwierdzenie pominięcia" --text="<big>⚠️ <b>Czy na pewno chcesz pominąć sprawdzanie zależności?</b></big>\n\n<span foreground='red'>Pominięcie tego kroku oznacza, że skrypt nie zweryfikuje, czy wymagane pakiety (Conky, Lua, Wget itp.) są zainstalowane.</span>\n\nJeśli ich brakuje, widżet nie uruchomi się poprawnie lub wystąpią błędy.\n\nCzy jesteś świadomy ryzyka i chcesz kontynuować?"; then
                 return 2
             else
                 trap 'error_exit "Nieoczekiwany błąd w skrypcie!" "trap"' ERR; continue
@@ -635,19 +764,24 @@ manual_install_loop() {
 
 if [ ${#MISSING_ON_START[@]} -ne 0 ]; then
     while :; do
-        # --- BLOK DLA NIEZNANEGO MENEDŻERA PAKIETÓW (POPRAWIONY OD KOLEGI) ---
+        # --- BLOK DLA NIEZNANEGO MENEDŻERA PAKIETÓW (ZMODYFIKOWANY GENTOO/OTHER) ---
         if [ "$UNKNOWN_PM" -eq 1 ]; then
             play_start_sound
             trap - ERR
             
+            # Logika wyboru nagłówka i tekstu (Gentoo vs Reszta Świata)
             if [ "$GENTOO_MODE" == "1" ]; then
+                # Fioletowy nagłówek dla Gentoo
                 HEADER_UNKNOWN="<span foreground='#d381c6'><big><big><b>Specjalny wyjątek dla Gentoo :)</b></big></big></span>"
                 TITLE_TEXT="Wykryto Gentoo Linux"
+                # Tekst zdefiniowany w sekcji 7 dla Gentoo
                 DISPLAY_TEXT="${MY_CUSTOM_TEXT}"
             else
+                # Czerwony nagłówek dla innych systemów
                 HEADER_UNKNOWN="<span foreground='red'><big><big><b>Nie rozpoznano menedżera pakietów!</b></big></big></span>"
                 TITLE_TEXT="Nieobsługiwany system"
                 
+                # Użyj MY_CUSTOM_TEXT jeśli istnieje, w przeciwnym razie tablica pakietów (kompatybilność wsteczna)
                 if [ -n "$MY_CUSTOM_TEXT" ]; then
                     DISPLAY_TEXT="${MY_CUSTOM_TEXT}"
                 else
@@ -660,20 +794,21 @@ if [ ${#MISSING_ON_START[@]} -ne 0 ]; then
                 --title="$TITLE_TEXT" \
                 --ok-label="Nie sprawdzaj zależności" \
                 --cancel-label="Anuluj" \
-                --text="<big><big>🖥️ System operacyjny: <b>$DISTRO_LABEL</b> | Wersja: <b>$VERSION</b></big></big>\n\n${HEADER_UNKNOWN}\n\nSkrypt nie posiada automatycznych reguł instalacji dla tego systemu.\nMusisz ręcznie zainstalować poniższe pakiety:\n\n<tt>${DISPLAY_TEXT}</tt>\n\n• <b>Nie sprawdzaj zależności</b> - Kliknij, aby pominąć weryfikację pakietów systemowych i przejść do reszty konfiguracji.\n• <b>Anuluj</b> – Zakończ działanie skryptu."
+                --text="<big><big>🖥️ System operacyjny: <b>$DISTRO_LABEL</b> | Wersja: <b>$VERSION</b></big></big>\n\n${HEADER_UNKNOWN}\n\nSkrypt nie posiada automatycznych reguł instalacji dla tego systemu.\nMusisz ręcznie zainstalować poniższe pakiety:\n\n<tt>${DISPLAY_TEXT}</tt>\n\n• <b>Nie sprawdzaj zależności</b> - Kliknij, aby pominąć weryfikację pakietów systemowych i przejść do dalszej konfiguracji.\n• <b>Anuluj</b> – Zakończ działanie skryptu."
             
             u_code=$?
             trap 'error_exit "Nieoczekiwany błąd w skrypcie!" "trap"' ERR
             
             if [ "$u_code" -eq 0 ]; then
-                # Użytkownik wybrał "Nie sprawdzaj zależności"
+                # Użytkownik wybrał "Nie sprawdzaj zależności" -> Idziemy do DKJSON
                 break
             else
+                # Użytkownik wybrał "Anuluj" lub zamknął okno
                 zenity_info_or_exit "⛔ <b>Skrypt został przerwany.</b>\nZainstaluj wymagane pakiety ręcznie i uruchom skrypt ponownie." 520
                 exit 0
             fi
         fi
-        # --- KONIEC BLOKU ---
+        # --- KONIEC BLOKU DLA NIEZNANEGO PM ---
 
         MISSING_NOW=()
         for pkg in "${REQUIRED_PACKAGES[@]}"; do
@@ -756,7 +891,7 @@ fi
 # 9. DETEKCJA WSPARCIA LUA W CONKY
 # ==========================================
 
-# POPRAWKA OD KOLEGI: Ulepszona detekcja ldd
+# --- WYKRYCIE WSPARCIA LUA W CONKY (ldd) ---
 CONKY_VER="$(conky -v 2>/dev/null || true)"
 HAS_LUA_IN_CONKY="no"
 CONKY_LUA="brak"
@@ -767,6 +902,8 @@ if printf "%s\n" "$CONKY_VER" | grep -qi '^ *Lua bindings:'; then
     if command -v conky &>/dev/null && command -v ldd &>/dev/null; then
         CONKY_BIN="$(command -v conky)"
         LDD_OUT="$(ldd "$CONKY_BIN" 2>/dev/null || true)"
+
+        # Uniwersalne złapanie wersji z nazwy biblioteki (liblua5.4.so.*, liblua.so.5.4, itp.)
         ver_from_ldd="$(printf "%s" "$LDD_OUT" \
             | grep -Eio 'liblua[^ ]*5\.[0-9]' \
             | grep -Eo '5\.[0-9]' \
@@ -779,6 +916,7 @@ if printf "%s\n" "$CONKY_VER" | grep -qi '^ *Lua bindings:'; then
         fi
     fi
 
+    # Plan B – spróbuj jeszcze wyciągnąć z samego `conky -v` (różne formaty)
     if [ "$CONKY_LUA" = "brak" ] || [ -z "$CONKY_LUA" ]; then
         ver="$(printf "%s" "$CONKY_VER" \
             | grep -ioE 'lua[[:space:]]*bindings[^0-9]*5\.[0-9]|built[[:space:]]*with[[:space:]]*lua[^0-9]*5\.[0-9]|lua[^0-9]*5\.[0-9]' \
@@ -788,6 +926,7 @@ if printf "%s\n" "$CONKY_VER" | grep -qi '^ *Lua bindings:'; then
     fi
 fi
 
+# --- Komunikaty końcowe nt. zgodności Lua (priorytet: wersja Conky) ---
 AVAILABLE_LUAS=()
 if command -v lua5.4 &>/dev/null; then AVAILABLE_LUAS+=("5.4"); fi
 if command -v lua5.3 &>/dev/null; then AVAILABLE_LUAS+=("5.3"); fi
@@ -838,7 +977,7 @@ trap 'error_exit "Nieoczekiwany błąd w skrypcie!" "trap"' ERR
 # 10. DKJSON
 # ==========================================
 
-# POPRAWKA OD KOLEGI: Sprawdzanie internetu przed pobraniem
+# --- dkjson.lua: stabilny check + atomowy zapis ---
 check_internet() {
     if command -v curl &>/dev/null; then
         curl -I --connect-timeout 3 --max-time 5 https://raw.githubusercontent.com/ 1>/dev/null 2>&1
@@ -860,12 +999,11 @@ else
 fi
 
 if zenity --question --title="Sukces! 🎉" --text="<big><big>Skrypt wykonał swoje zadanie 😊</big></big>\nCzy chcesz teraz uruchomić kolejny skrypt <b>\"2.menager_kont.sh\"</b>, który pomoże Ci skonfigurować konta pocztowe?\n<span foreground='red'>Jest to konieczne do prawidłowego działania widgetu.</span>" --ok-label="Tak" --cancel-label="Nie"; then
-    # ZACHOWANO TWOJĄ NAZWĘ PLIKU: 2.menager_kont.sh
-    if [ -f "$SCRIPT_DIR/2.menager_kont.sh" ]; then
-        bash "$SCRIPT_DIR/2.menager_kont.sh" &
+    if [ -f "2.menager_kont.sh" ]; then
+        bash "2.menager_kont.sh" &
         exit 0
     else
-        zenity --error --text="Nie znaleziono pliku \"2.menager_kont.sh\" w katalogu:\n$SCRIPT_DIR"
+        zenity --error --text="Nie znaleziono pliku \"2.menager_kont.sh\"!"
         exit 1
     fi
 else

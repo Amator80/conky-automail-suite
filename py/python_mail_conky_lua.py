@@ -147,20 +147,22 @@ def get_ts():
 
 def decrypt_password(encrypted_pass):
     """
-    Odszyfrowuje hasło przy użyciu klucza z pliku .secret_key (AES-256-CBC).
+    Odszyfrowuje hasło (AES-256-CBC).
+    TYLKO NOWY STANDARD (Security Pro):
+    - Wymaga flagi -iter 100000 (zgodne z nowym skryptem Bash)
     """
     if not encrypted_pass:
         return ""
     
-    # Jeśli plik klucza nie istnieje, zakładamy, że hasło jest plaintext (kompatybilność)
+    # Jeśli plik klucza nie istnieje, zakładamy, że hasło jest plaintext
     if not os.path.exists(SECRET_KEY_PATH):
         return encrypted_pass
 
+    # --- TYLKO NOWY STANDARD (100k iteracji) ---
     try:
-        # Wywołanie: echo -n "..." | openssl enc -d -aes-256-cbc -salt -pbkdf2 -pass file:KEY -a -A
         result = subprocess.run(
             ['openssl', 'enc', '-d', '-aes-256-cbc', 
-             '-salt', '-pbkdf2', 
+             '-salt', '-pbkdf2', '-iter', '100000',  # <--- WYMUSZONE
              '-pass', f'file:{SECRET_KEY_PATH}', 
              '-a', '-A'],
             input=encrypted_pass.encode('utf-8'),
@@ -170,7 +172,8 @@ def decrypt_password(encrypted_pass):
         )
         return result.stdout.decode('utf-8')
     except Exception:
-        # W razie błędu (np. hasło nie było zaszyfrowane, tylko stare plaintext), zwróć oryginał
+        # Jeśli się nie uda (np. hasło jest w starym formacie), zwracamy oryginał.
+        # Spowoduje to błąd logowania IMAP, co jest pożądanym zachowaniem (brak kompatybilności).
         return encrypted_pass
 
 # ===============================================================

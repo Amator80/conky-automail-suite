@@ -5,6 +5,10 @@
 # - [UI FIX] Logika pierwszego uruchomienia i zmiany hasła
 # - [FIX] Usuwanie/Zmiana hasła wymaga autoryzacji
 # - [FIX] DEEP SCAN + Twardy Reset
+# - [NEW] EXPORT / IMPORT (Z obsługą Podpowiedzi/Hint + Auto-Cleanup)
+# - [SEC] HARDENING (PBKDF2 z 100k iteracji + Memory Hygiene)
+# - [MOD] IMPORT STRICT MODE (Tylko pliki z nagłówkiem HINT)
+# - [MOD] IMPORT RETRY LOOP (Możliwość ponowienia błędnego hasła)
 # ===================================================================================
 
 # --- ŚCIEŻKI KONFIGURACYJNE ---
@@ -71,7 +75,7 @@ else
 fi
 
 # ===================================================================================
-# SYSTEM HASŁA GŁÓWNEGO
+# SYSTEM HASŁA GŁÓWNEGO (ZMODYFIKOWANY - HARDENING)
 # ===================================================================================
 
 save_new_master_password() {
@@ -81,8 +85,8 @@ save_new_master_password() {
     if [ "$NEW_PASS" == "$DISABLED_MARKER" ]; then
         HASH_TO_SAVE="$DISABLED_MARKER"
     else
-        # Szyfrujemy challenge nowym hasłem
-        HASH_TO_SAVE=$(echo -n "$CHALLENGE_TEXT" | openssl enc -aes-256-cbc -salt -pbkdf2 -pass pass:"$NEW_PASS" -a -A)
+        # Szyfrujemy challenge nowym hasłem (DODANO: -iter 100000)
+        HASH_TO_SAVE=$(echo -n "$CHALLENGE_TEXT" | openssl enc -aes-256-cbc -salt -pbkdf2 -iter 100000 -pass pass:"$NEW_PASS" -a -A)
     fi
     
     # Zapisujemy do JSON zachowując istniejące konta
@@ -175,8 +179,12 @@ change_password_gui() {
         
         if [ $? -ne 0 ]; then return 1; fi
         
+        # Weryfikacja (DODANO: -iter 100000)
         local CHECK_HASH
-        CHECK_HASH=$(echo "$CURRENT_HASH" | openssl enc -d -aes-256-cbc -salt -pbkdf2 -pass pass:"$VERIFY_PASS" -a -A 2>/dev/null)
+        CHECK_HASH=$(echo "$CURRENT_HASH" | openssl enc -d -aes-256-cbc -salt -pbkdf2 -iter 100000 -pass pass:"$VERIFY_PASS" -a -A 2>/dev/null)
+        
+        # Czyszczenie RAM
+        unset VERIFY_PASS
         
         if [[ "$CHECK_HASH" != "$CHALLENGE_TEXT" ]]; then
             yad --error --center --fixed --width=300 --text="<b>Błędne hasło!</b>\nNie można usunąć zabezpieczeń."
@@ -223,8 +231,11 @@ change_password_gui() {
         
         if [ $? -ne 0 ]; then return 1; fi
 
+        # Weryfikacja (DODANO: -iter 100000)
         local CHECK_HASH_CHANGE
-        CHECK_HASH_CHANGE=$(echo "$CURRENT_HASH" | openssl enc -d -aes-256-cbc -salt -pbkdf2 -pass pass:"$VERIFY_PASS_CHANGE" -a -A 2>/dev/null)
+        CHECK_HASH_CHANGE=$(echo "$CURRENT_HASH" | openssl enc -d -aes-256-cbc -salt -pbkdf2 -iter 100000 -pass pass:"$VERIFY_PASS_CHANGE" -a -A 2>/dev/null)
+        
+        unset VERIFY_PASS_CHANGE
 
         if [[ "$CHECK_HASH_CHANGE" != "$CHALLENGE_TEXT" ]]; then
             yad --error --center --fixed --width=300 --text="<b>Błędne stare hasło!</b>\nZmiana hasła została odrzucona."
@@ -235,9 +246,11 @@ change_password_gui() {
 
     # Zapisz
     if save_new_master_password "$P1"; then
+        unset P1 P2
         yad --info --center --text="Konfiguracja bezpieczeństwa zaktualizowana."
         return 0
     else
+        unset P1 P2
         yad --error --center --text="Błąd zapisu konfiguracji!"
         return 1
     fi
@@ -383,7 +396,10 @@ verify_access() {
         fi
 
         local DECRYPTED_ATTEMPT
-        DECRYPTED_ATTEMPT=$(echo "$CURRENT_BLOB" | openssl enc -d -aes-256-cbc -salt -pbkdf2 -pass pass:"$INPUT_PASS" -a -A 2>/dev/null)
+        # Odszyfrowanie z -iter 100000
+        DECRYPTED_ATTEMPT=$(echo "$CURRENT_BLOB" | openssl enc -d -aes-256-cbc -salt -pbkdf2 -iter 100000 -pass pass:"$INPUT_PASS" -a -A 2>/dev/null)
+        
+        unset INPUT_PASS
 
         if [[ "$DECRYPTED_ATTEMPT" == "$CHALLENGE_TEXT" ]]; then
             rm -f "$ATTEMPT_FILE"
@@ -397,7 +413,7 @@ verify_access() {
 }
 
 # ===================================================================================
-# FUNKCJE SZYFROWANIA I GUI
+# FUNKCJE SZYFROWANIA I GUI (ZMODYFIKOWANE - HARDENING)
 # ===================================================================================
 
 ensure_key_exists() {
@@ -412,7 +428,8 @@ encrypt_pass() {
     local cleartext="$1"
     [[ -z "$cleartext" ]] && echo "" && return
     ensure_key_exists
-    echo -n "$cleartext" | openssl enc -aes-256-cbc -salt -pbkdf2 -pass file:"$SECRET_KEY" -a -A
+    # ZMIANA: Dodano -iter 100000
+    echo -n "$cleartext" | openssl enc -aes-256-cbc -salt -pbkdf2 -iter 100000 -pass file:"$SECRET_KEY" -a -A
 }
 
 decrypt_pass() {
@@ -420,9 +437,204 @@ decrypt_pass() {
     [[ -z "$encrypted" ]] && echo "" && return
     ensure_key_exists
     local decrypted
-    decrypted=$(echo "$encrypted" | openssl enc -aes-256-cbc -d -salt -pbkdf2 -pass file:"$SECRET_KEY" -a -A 2>/dev/null)
+    # ZMIANA: Dodano -iter 100000
+    decrypted=$(echo "$encrypted" | openssl enc -aes-256-cbc -d -salt -pbkdf2 -iter 100000 -pass file:"$SECRET_KEY" -a -A 2>/dev/null)
     if [ $? -eq 0 ]; then echo "$decrypted"; else echo "$encrypted"; fi
 }
+
+# --- FUNKCJE IMPORT / EXPORT (Z PODPOWIEDZIĄ I HARDENINGIEM) ---
+
+export_configuration() {
+    # 1. Wybór miejsca zapisu
+    local EXPORT_FILE
+    EXPORT_FILE=$(yad --file --save --title="Eksportuj konfigurację" \
+        --filename="$HOME/moje_konta_email.bkp" \
+        --file-filter="Pliki kopii (*.bkp)|*.bkp" \
+        --width=600 --center --on-top)
+
+    [[ -z "$EXPORT_FILE" ]] && return
+
+    if [[ ! "$EXPORT_FILE" == *.bkp ]]; then
+        EXPORT_FILE="${EXPORT_FILE}.bkp"
+    fi
+
+    # 2. Hasło + PODPOWIEDŹ
+    local FORM_DATA
+    FORM_DATA=$(yad --form --center --fixed --width=450 --title="Zabezpiecz plik eksportu" \
+        --image="dialog-password" \
+        --separator="|" \
+        --text="Hasło zabezpieczy plik. Podpowiedź będzie widoczna dla każdego." \
+        --field="Hasło eksportu::H" \
+        --field="Powtórz hasło::H" \
+        --field="Podpowiedź (opcjonalnie):" \
+        --button="Eksportuj:0" --button="Anuluj:1")
+
+    if [ $? -ne 0 ]; then return; fi
+
+    local P1=$(echo "$FORM_DATA" | cut -d'|' -f1)
+    local P2=$(echo "$FORM_DATA" | cut -d'|' -f2)
+    local HINT=$(echo "$FORM_DATA" | cut -d'|' -f3)
+
+    if [[ -z "$P1" ]] || [[ "$P1" != "$P2" ]]; then
+        yad --error --center --text="Hasła nie są identyczne lub są puste!"
+        return
+    fi
+    
+    # Jeśli brak podpowiedzi, wstaw tekst domyślny
+    [[ -z "$HINT" ]] && HINT="Brak podpowiedzi"
+
+    # 3. Przetwarzanie
+    local EXPORT_JSON='{"accounts":[]}'
+    local ACCOUNT_COUNT=$(jq '.accounts | length' "$CONFIG_PATH")
+
+    (
+    echo "0"; echo "# Szyfrowanie danych..."
+    for ((i=0; i<ACCOUNT_COUNT; i++)); do
+        local PROGRESS=$(( (i * 90) / ACCOUNT_COUNT ))
+        echo "$PROGRESS"
+        
+        local RAW_DATA=$(jq -r ".accounts[$i]" "$CONFIG_PATH")
+        local ENC_PASS=$(echo "$RAW_DATA" | jq -r '.password')
+        
+        local DEC_PASS=""
+        if [[ "$ENC_PASS" != "null" && -n "$ENC_PASS" ]]; then
+            DEC_PASS=$(decrypt_pass "$ENC_PASS")
+        fi
+        
+        EXPORT_JSON=$(echo "$EXPORT_JSON" | jq --argjson acct "$RAW_DATA" --arg pass "$DEC_PASS" \
+            '.accounts += [$acct | .password = $pass]')
+            
+        # CZYSZCZENIE RAM (BEZPIECZEŃSTWO)
+        unset DEC_PASS
+    done
+    
+    echo "95"; echo "# Zapisywanie pliku..."
+    
+    # Zapisz NAGŁÓWEK z podpowiedzią (jawny) + PUSTA LINIA + ZASZYFROWANA TREŚĆ
+    echo "#HINT:$HINT" > "$EXPORT_FILE"
+    echo "$EXPORT_JSON" | openssl enc -aes-256-cbc -salt -pbkdf2 -iter 100000 -pass pass:"$P1" -a -A >> "$EXPORT_FILE"
+    
+    # CZYSZCZENIE RAM
+    unset P1 P2 EXPORT_JSON
+    
+    echo "100"; echo "# Gotowe!"
+    sleep 1
+    ) | yad --progress --pulsate --title="Eksportowanie" --center --auto-close --width=400
+
+    if [ -s "$EXPORT_FILE" ]; then
+        yad --info --center --text="Eksport zakończony!\n\nPlik: $EXPORT_FILE\nZapisana podpowiedź: <b>$HINT</b>"
+    fi
+}
+
+import_configuration() {
+    # 1. Wybór pliku
+    local IMPORT_FILE
+    IMPORT_FILE=$(yad --file --title="Importuj konfigurację" \
+        --file-filter="Pliki kopii (*.bkp)|*.bkp" \
+        --width=600 --center --on-top)
+
+    [[ -z "$IMPORT_FILE" ]] && return
+
+    # 2. Weryfikacja nagłówka (STRICT MODE - NO BACKWARD COMPATIBILITY)
+    local FIRST_LINE=$(head -n 1 "$IMPORT_FILE")
+
+    if [[ "$FIRST_LINE" != "#HINT:"* ]]; then
+        yad --error --center --fixed --width=500 \
+            --title="Błąd formatu pliku" \
+            --text="<b>Nieprawidłowy format pliku!</b>\n\nTen plik nie posiada nagłówka #HINT.\nImport plików starszej wersji nie jest obsługiwany."
+        return
+    fi
+
+    local HINT_MSG="${FIRST_LINE#*#HINT:}"
+    local DECRYPTED_JSON=""
+
+    # --- PĘTLA RETRY (NOWOŚĆ) ---
+    while true; do
+        # 3. Pytanie o hasło z wyświetleniem podpowiedzi
+        local TRANSPORT_PASS
+        TRANSPORT_PASS=$(yad --entry --center --fixed --width=450 --title="Autoryzacja importu" \
+            --image="dialog-password" \
+            --text="Wykryto plik kopii zapasowej.\n\nPodpowiedź do hasła:\n<span color='blue' size='large'><b>$HINT_MSG</b></span>\n\nPodaj hasło:" \
+            --hide-text \
+            --button="Importuj:0" --button="Anuluj:1")
+
+        if [ $? -ne 0 ]; then return; fi
+
+        # 4. Odszyfrowanie (Zawsze pomijamy pierwszą linię - wymuszony standard)
+        local ENCRYPTED_CONTENT
+        ENCRYPTED_CONTENT=$(tail -n +2 "$IMPORT_FILE")
+
+        DECRYPTED_JSON=$(echo "$ENCRYPTED_CONTENT" | openssl enc -d -aes-256-cbc -salt -pbkdf2 -iter 100000 -pass pass:"$TRANSPORT_PASS" -a -A 2>/dev/null)
+
+        # CZYSZCZENIE RAM
+        unset TRANSPORT_PASS
+
+        if echo "$DECRYPTED_JSON" | jq empty > /dev/null 2>&1; then
+            # Hasło poprawne - wychodzimy z pętli
+            break
+        else
+            # Hasło błędne - pytamy czy powtórzyć
+            yad --center --fixed --width=400 --image="dialog-error" \
+                --title="Błąd deszyfrowania" \
+                --text="<b>Błąd importu!</b>\n\nPodano błędne hasło lub plik jest uszkodzony.\nCzy chcesz spróbować ponownie?" \
+                --button="SPRÓBUJ PONOWNIE:0" --button="Anuluj:1"
+            
+            if [ $? -ne 0 ]; then return; fi
+            # Jeśli 0 (Spróbuj ponownie), pętla while kręci się dalej
+        fi
+    done
+    # --- KONIEC PĘTLI RETRY ---
+
+    yad --question --center --fixed --image="dialog-warning" \
+        --title="UWAGA: Nadpisywanie danych" \
+        --text="Import zastąpi Twoje obecne konta tymi z pliku.\n\nCzy chcesz kontynuować?" \
+        --button="TAK, importuj:0" --button="Nie:1"
+    
+    if [ $? -ne 0 ]; then return; fi
+
+    # 5. Przeszyfrowanie
+    cp "$CONFIG_PATH" "${CONFIG_PATH}.bak"
+
+    local NEW_ACCOUNTS_JSON='[]'
+    local ACCOUNT_COUNT=$(echo "$DECRYPTED_JSON" | jq '.accounts | length')
+
+    (
+    echo "0"; echo "# Przetwarzanie..."
+    for ((i=0; i<ACCOUNT_COUNT; i++)); do
+        local PROGRESS=$(( (i * 100) / ACCOUNT_COUNT ))
+        echo "$PROGRESS"
+        
+        local RAW_DATA=$(echo "$DECRYPTED_JSON" | jq ".accounts[$i]")
+        local CLEAR_PASS=$(echo "$RAW_DATA" | jq -r '.password')
+        
+        local NEW_ENC_PASS=""
+        if [[ "$CLEAR_PASS" != "null" && -n "$CLEAR_PASS" ]]; then
+            NEW_ENC_PASS=$(encrypt_pass "$CLEAR_PASS")
+        fi
+        
+        NEW_ACCOUNTS_JSON=$(echo "$NEW_ACCOUNTS_JSON" | jq --argjson acct "$RAW_DATA" --arg pass "$NEW_ENC_PASS" \
+            '. + [$acct | .password = $pass]')
+            
+        unset CLEAR_PASS
+    done
+    unset DECRYPTED_JSON
+
+    local CURRENT_MASTER_HASH=$(jq -r '.master_hash // null' "${CONFIG_PATH}.bak")
+    
+    jq -n --argjson accts "$NEW_ACCOUNTS_JSON" --arg mh "$CURRENT_MASTER_HASH" \
+        '{master_hash: (if $mh=="null" then null else $mh end), accounts: $accts}' > "$CONFIG_PATH"
+
+    echo "100"; echo "# Zakończono!"
+    sleep 1
+    ) | yad --progress --pulsate --title="Importowanie" --center --auto-close --width=400
+
+    if [ -s "$CONFIG_PATH" ]; then rm -f "${CONFIG_PATH}.bak"; fi
+
+    echo "0" > "$SELECTOR_FILE"
+    yad --info --center --text="Import zakończony pomyślnie!\nWczytano konta: $ACCOUNT_COUNT"
+}
+
+# --- KONIEC NOWYCH FUNKCJI ---
 
 SCREEN_GEOMETRY=$(xrandr | grep '*' | head -n 1 | awk '{print $1}')
 SCREEN_WIDTH=$(echo "$SCREEN_GEOMETRY" | cut -d'x' -f1)
@@ -819,7 +1031,6 @@ move_account() {
 if verify_access; then
     while true; do
         ACCOUNTS_INFO=()
-        local ACCOUNT_COUNT
         ACCOUNT_COUNT=$(jq '.accounts | length' "$CONFIG_PATH")
 
         for i in $(seq 0 $((ACCOUNT_COUNT - 1))); do
@@ -853,7 +1064,7 @@ if verify_access; then
         CHOICE_AND_SELECTION=$(yad --list \
             --title="Konfigurator kont e-mail" \
             --geometry="${WIN_WIDTH}x${WIN_HEIGHT}+$POS_X+$POS_Y" \
-            --text="<b>Zarządzaj kontami e-mail.</b>\n- Kliknij dwukrotnie, aby <b>edytować</b> pojedyncze konto (HASŁA SĄ UKRYTE).\n- Zaznacz jedno konto i użyj przycisków, aby je <b>przesunąć</b>.\n- Aby <b>usunąć wiele kont naraz</b>, zaznacz je przytrzymując \Ctrl\ lub \Shift\.\n- Użyj przycisków na dole do wykonania pozostałych akcji." \
+            --text="<b>Zarządzaj kontami e-mail.</b>\n- Kliknij dwukrotnie, aby <b>edytować</b> pojedyncze konto (HASŁA SĄ UKRYTE).\n- Użyj przycisków <b>IMPORT / EKSPORT</b> aby przenieść konta na inny komputer.\n- Aby <b>usunąć wiele kont naraz</b>, zaznacz je przytrzymując \Ctrl\ lub \Shift\." \
             --column="Stan:TEXT" --column="Slot" --column="Login / Nazwa:TEXT" \
             --print-column=2 \
             --multiple \
@@ -863,6 +1074,8 @@ if verify_access; then
             --button="Przesuń w górę:50" \
             --button="Przesuń w dół:60" \
             --button="Wybierz konta:2" \
+            --button="EKSPORT:7" \
+            --button="IMPORT:8" \
             --button="Zamknij:1" \
             "${ACCOUNTS_INFO[@]}")
             
@@ -887,6 +1100,12 @@ if verify_access; then
             5)
                 # Wywołanie ręcznej zmiany hasła
                 change_password_gui
+                ;;
+            7)
+                export_configuration
+                ;;
+            8)
+                import_configuration
                 ;;
             50) 
                 move_account "$CHOICE_AND_SELECTION" "up"

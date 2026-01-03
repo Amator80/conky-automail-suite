@@ -22,11 +22,4 @@ TRIGGER_FILE="/dev/shm/conky-automail-suite/force_scroll_trigger"
 touch "$TRIGGER_FILE"
 
 # --- POTWIERDZENIE DLA UŻYTKOWNIKA ---
-echo "Sygnał do ponownego przewinięcia tekstów został wysłany."```
-
-### Podsumowanie
-
-1.  Użyj **dokładnie tej wersji skryptu Lua**, którą podałem w poprzedniej odpowiedzi.
-2.  Użyj **dokładnie tej wersji skryptu Bash**, którą podałem powyżej.
-
-Po tych dwóch krokach system musi działać poprawnie. Skrypt Bash utworzy odpowiedni plik, a skrypt Lua go wykryje i zareaguje, ponieważ teraz obie części "rozmawiają" o tym samym pliku.
+echo "Sygnał do ponownego przewinięcia tekstów został wysłany."
