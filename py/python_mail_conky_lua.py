@@ -1214,6 +1214,8 @@ def _build_mail_entry(raw_msg, preview_lines, sort_preview, include_meta, do_geo
         
         # <<< ZMIANA: Zamiast blokującego geoip_lookup, sprawdzamy cache lub kolejkujemy >>>
         ip_meta = {}
+        is_pending = False # Domyślnie fałsz
+
         if do_geoip and ip:
             with _geoip_cache_lock:
                 cached = _geoip_cache_mem.get(ip)
@@ -1224,8 +1226,9 @@ def _build_mail_entry(raw_msg, preview_lines, sort_preview, include_meta, do_geo
                 if diag is not None:
                     diag['geoip_cache_hits'] = diag.get('geoip_cache_hits', 0) + 1
             else:
-                # Jeśli nie ma, wrzucamy do kolejki dla GeoIPWorker (jeśli nie jest prywatny)
+                # Jeśli nie ma w cache i jest publiczne -> oznaczamy jako PENDING i kolejkujemy
                 if not is_private_ipv4(ip) and not is_ipv6(ip):
+                    is_pending = True 
                     with _geoip_pending_lock:
                         if ip not in _geoip_pending:
                             _geoip_pending.add(ip)
@@ -1233,7 +1236,6 @@ def _build_mail_entry(raw_msg, preview_lines, sort_preview, include_meta, do_geo
 
         meta = {
             "datetime": mail_dt,
-            # "age_text": age_text, # <-- USUNIĘTA LINIA
             "ip": ip,
             "ip_city": ip_meta.get("city", ""),
             "isp": ip_meta.get("isp", ""),
@@ -1241,7 +1243,8 @@ def _build_mail_entry(raw_msg, preview_lines, sort_preview, include_meta, do_geo
             "country_code": ip_meta.get("country_code", ""),
             "agent": user_agent,
             "system": system,
-            "mobile": ip_meta.get("mobile", False)
+            "mobile": ip_meta.get("mobile", False),
+            "geoip_pending": is_pending  # <--- NOWA FLAGA DLA LUA
         }
 
     return {
@@ -1980,16 +1983,22 @@ if __name__ == "__main__":
                          for mail in final_output_data['mails']:
                              meta = mail.get('meta', {})
                              ip = meta.get('ip')
-                             # Jeśli pole kraju puste, a mamy to w cache -> uzupełniamy
-                             if ip and not meta.get('country') and ip in _geoip_cache_mem:
+                             
+                             # Jeśli IP jest w cache, to na pewno już nie jest pending
+                             if ip and ip in _geoip_cache_mem:
                                  cached = _geoip_cache_mem[ip]
-                                 meta['ip_city'] = cached.get('city', "")
-                                 meta['isp'] = cached.get('isp', "")
-                                 meta['country'] = cached.get('country', "")
-                                 meta['country_code'] = cached.get('country_code', "")
-                                 meta['mobile'] = cached.get('mobile', False)
-
-                # Tutaj powinna być linia: last_seen_uids = load_last_seen()
+                                 
+                                 # 1. Uzupełniamy dane, jeśli ich brakowało (bo Worker nie zdążył)
+                                 if not meta.get('country'):
+                                     meta['ip_city'] = cached.get('city', "")
+                                     meta['isp'] = cached.get('isp', "")
+                                     meta['country'] = cached.get('country', "")
+                                     meta['country_code'] = cached.get('country_code', "")
+                                     meta['mobile'] = cached.get('mobile', False)
+                                 
+                                 # 2. SKORO MAMY DANE, TO ZDEJMUJEMY FLAGĘ OCZEKIWANIA
+                                 # To jest sygnał dla Lua, żeby odblokować przewijanie
+                                 meta['geoip_pending'] = False
 
                 last_seen_uids = load_last_seen()
                 current_uids_in_output = set()

@@ -397,7 +397,7 @@ META_SHOW_COUNTRY = true    -- [true/false] Czy pokazywać kraj nadawcy
 META_SHOW_MOBILE = true     -- [true/false] Czy pokazywać "MOBILNY" jeśli mail wysłany przez sieć mobilną
 
 -- [MODYFIKACJA] Odejmujemy margines 225 od szerokości całkowitej
-META_LINE_MAX_WIDTH = (GLOBAL_WIDTH_MODIFIER - 225) * GLOBAL_SCALE_FACTOR    -- **Maksymalna szerokość meta-linii w px**
+META_LINE_MAX_WIDTH = (GLOBAL_WIDTH_MODIFIER - 245) * GLOBAL_SCALE_FACTOR    -- **Maksymalna szerokość meta-linii w px**
 
 META_LINE_SCROLL_ENABLE = true    -- [true/false] Czy przewijać meta-linię, jeśli za długa
 META_LINE_SCROLL_SPEED = 37 * GLOBAL_SCALE_FACTOR    -- Prędkość przewijania (px/s)
@@ -1606,25 +1606,24 @@ local function get_mail_from_id(mail, from_txt)
     return get_mail_id(mail) .. "|FROM_SCROLL|" .. (from_txt or "")
 end
 
-print("[diag] conky_parse:", type(_G.conky_parse))
--- w okolicach definicji now_time() wstaw zamiast starej:
-local _tick_counter = 0
+-- ==========================================================
+-- === FUNKCJA CZASU (/proc/uptime) ===
+-- ==========================================================
 local function now_time()
-    -- OPTYMALIZACJA: Unikamy conky_parse("${updates}") co klatkę, bo to kosztowne parsowanie stringów.
-    -- Jeśli conky_info jest dostępne (nowe wersje), używamy go.
-    local dt = (type(_G.conky_info) == "table" and tonumber(_G.conky_info.update_interval)) or 1
-    local upd = 0
-    if type(_G.conky_info) == "table" and _G.conky_info.updates then
-        upd = tonumber(_G.conky_info.updates) or 0
-    elseif type(_G.conky_parse) == "function" then
-        -- Fallback tylko dla starszych wersji
-        local ok, updates = pcall(_G.conky_parse, "${updates}")
-        upd = tonumber(ok and updates or 0) or 0
-    else
-        _tick_counter = _tick_counter + 1
-        upd = _tick_counter
+    -- Próbujemy odczytać czas z /proc/uptime (czas rzeczywisty RAM)
+    local f = io.open("/proc/uptime", "r")
+    if f then
+        local content = f:read("*a")
+        f:close()
+        -- Wyciągamy pierwszą liczbę (sekundy.setne) z pliku
+        local uptime = content:match("^(%d+[%.]?%d*)")
+        if uptime then
+            return tonumber(uptime)
+        end
     end
-    return upd * dt
+    
+    -- Fallback: jeśli system nie ma /proc/uptime (mało prawdopodobne)
+    return os.time()
 end
 
 -- =========================
@@ -2316,56 +2315,117 @@ local function segments_signature(segments)
 end
 
 -- =============================================================
--- === FIX: Dodano parametr dynamic_max_width (dynamiczna szerokość) ===
+-- === FIX: Dynamiczna szerokość + ZAMRAŻANIE CZASU TYLKO NA CZAS RUCHU (SMART) ===
 -- =============================================================
 local function draw_meta_line_rich(cr, mail, x, y, force_scroll_active, dynamic_max_width)
     local meta_id = "meta|" .. (mail.uid or get_mail_id(mail))
     
-    local segments = build_meta_line_segments(mail)
-    if #segments == 0 then return end
+    -- 1. Pobieramy NAJŚWIEŻSZE dane (z aktualnym czasem)
+    local current_segments = build_meta_line_segments(mail)
+    if #current_segments == 0 then return end
     
     local current_max_width = dynamic_max_width or META_LINE_MAX_WIDTH
 
-    -- [OPTYMALIZACJA]
+    -- [OPTYMALIZACJA] Tryb uśpienia - rysujemy statycznie
     if RENDER_MODE == "idle" then
-        draw_meta_segments_trimmed(cr, segments, META_LINE_FONT_NAME, META_LINE_FONT_BOLD, META_LINE_FONT_SIZE, META_LINE_FONT_ITALIC, x, y, current_max_width)
+        draw_meta_segments_trimmed(cr, current_segments, META_LINE_FONT_NAME, META_LINE_FONT_BOLD, META_LINE_FONT_SIZE, META_LINE_FONT_ITALIC, x, y, current_max_width)
         return
     end
+
+    -- Blokada GeoIP Pending
+    if mail.meta and mail.meta.geoip_pending == true then
+        draw_meta_segments_trimmed(cr, current_segments, META_LINE_FONT_NAME, META_LINE_FONT_BOLD, META_LINE_FONT_SIZE, META_LINE_FONT_ITALIC, x, y, current_max_width)
+        return
+    end
+
+    -- Sygnatura GeoIP (bez czasu) do wykrywania zmian lokalizacji (np. nagle doszło miasto)
+    local m = mail.meta or {}
+    local geo_sig = (m.ip or "") .. "|" .. (m.ip_city or "") .. "|" .. (m.country or "") .. "|" .. (m.isp or "")
 
     local now = now_time()
     local state = meta_scroll_states[meta_id]
     
-    -- [[ POPRAWKA PRZEWIJANIA v3 ]]
+    -- Inicjalizacja stanu
     if not state or state.last_mail_id ~= meta_id then
-        state = {start_time=now, phase="start", rep=0, last_mail_id=meta_id}
+        state = {
+            start_time = now, 
+            phase = "start", 
+            rep = 0, 
+            last_mail_id = meta_id, 
+            last_sig = geo_sig,
+            frozen_segments = current_segments -- Na start przypisujemy aktualne
+        }
         meta_scroll_states[meta_id] = state
+        
         if (not force_scroll_active and should_start_scrolling(mail) == false) or is_first_run_of_script then
             state.phase = "done"
         end
     end
+
+    -- =================================================================================
+    -- [FIX LOGIKA ODŚWIEŻANIA]
+    -- Aktualizujemy treść w fazie "start". Zamrażamy w fazie "scroll".
+    -- Dzięki temu przy każdym powtórzeniu (rep 1, rep 2...) bierzemy nowy czas.
+    -- =================================================================================
+    local segments_to_draw = current_segments
+
+    if state.phase == "scroll" or state.phase == "pause_end" then
+        -- Jesteśmy W TRAKCIE ruchu lub pauzy po ruchu.
+        -- Używamy ZAMROŻONEJ wersji (nie aktualizujemy czasu, żeby nie szarpało).
+        if state.frozen_segments then
+            segments_to_draw = state.frozen_segments
+        else
+            -- Zabezpieczenie (gdyby coś było nil)
+            state.frozen_segments = current_segments
+            segments_to_draw = current_segments
+        end
+    else
+        -- Jesteśmy w fazie "start" (czekanie na ruch) lub "done".
+        -- Tutaj AKTUALIZUJEMY stan zamrożony na bieżąco.
+        -- Kiedy faza zmieni się na "scroll", system użyje tej ostatniej, świeżej wartości.
+        state.frozen_segments = current_segments
+        segments_to_draw = current_segments
+    end
+    -- =================================================================================
 
     local font_name = META_LINE_FONT_NAME
     local font_bold = META_LINE_FONT_BOLD
     local font_size = META_LINE_FONT_SIZE
     local font_italic = META_LINE_FONT_ITALIC
 
-    local sig = segments_signature(segments)
-    local key = table.concat({sig, font_name, font_size, font_bold and "b" or "n", font_italic and "i" or "n"}, "|")
-    local total_width = meta_width_cache[key]
+    -- Mierzymy szerokość TEGO CO RYSUJEMY (czyli albo zamrożonego, albo świeżego)
+    local width_sig = segments_signature(segments_to_draw)
+    local width_key = table.concat({width_sig, font_name, font_size, font_bold and "b" or "n", font_italic and "i" or "n"}, "|")
+    local total_width = meta_width_cache[width_key]
     if not total_width then
-        total_width = measure_meta_line_width(cr, segments, font_name, font_bold, font_size, font_italic)
-        meta_width_cache[key] = total_width
+        total_width = measure_meta_line_width(cr, segments_to_draw, font_name, font_bold, font_size, font_italic)
+        meta_width_cache[width_key] = total_width
     end
 
-    -- Używamy calculated current_max_width zamiast globalnej stałej
+    -- 2. Sprawdzamy czy tekst mieści się w całości
     if total_width <= current_max_width or not META_LINE_SCROLL_ENABLE then
-        if state then state.phase = "done" end
-        draw_meta_segments_trimmed(cr, segments, font_name, font_bold, font_size, font_italic, x, y, current_max_width)
+        if state then 
+            state.phase = "done" 
+            state.last_sig = geo_sig 
+        end
+        draw_meta_segments_trimmed(cr, segments_to_draw, font_name, font_bold, font_size, font_italic, x, y, current_max_width)
         return
+    end
+
+    -- 3. Reset animacji, jeśli zmieniły się dane geograficzne (nie czas)
+    if state.last_sig ~= geo_sig then
+        state.phase = "start"
+        state.start_time = now
+        state.rep = 0
+        state.last_sig = geo_sig
+        state.frozen_segments = current_segments -- Reset treści
+        is_animation_running = true
+        segments_to_draw = current_segments
     end
 
     if state.phase ~= "done" then is_animation_running = true end
 
+    -- --- RYSOWANIE PRZEWIJANIA ---
     local scroll_extra = META_LINE_SCROLL_EXTRA or (36 * GLOBAL_SCALE_FACTOR)
     local scroll_len = total_width - current_max_width + scroll_extra
     if scroll_len < 1 then scroll_len = 1 end
@@ -2380,10 +2440,12 @@ local function draw_meta_line_rich(cr, mail, x, y, force_scroll_active, dynamic_
 
     if phase == "start" then
         if elapsed < delay_start then
-            draw_meta_segments_trimmed(cr, segments, font_name, font_bold, font_size, font_italic, x, y, current_max_width)
+            -- Rysujemy statycznie (ale odświeżamy czas, patrz logika wyżej)
+            draw_meta_segments_trimmed(cr, segments_to_draw, font_name, font_bold, font_size, font_italic, x, y, current_max_width)
         else
             state.phase = "scroll"
             state.start_time = now
+            -- W TYM MOMENCIE segments_to_draw przestanie być aktualizowane w następnej klatce
         end
 
     elseif phase == "scroll" then
@@ -2392,10 +2454,9 @@ local function draw_meta_line_rich(cr, mail, x, y, force_scroll_active, dynamic_
         local offset = ease_t * scroll_len
 
         cairo_save(cr)
-        -- Clipowanie też musi uwzględniać aktualną szerokość
         cairo_rectangle(cr, x, y - font_size, current_max_width, font_size + (12 * GLOBAL_SCALE_FACTOR))
         cairo_clip(cr)
-        draw_meta_segments_scrolling(cr, segments, font_name, font_bold, font_size, font_italic, x, y, current_max_width, offset)
+        draw_meta_segments_scrolling(cr, segments_to_draw, font_name, font_bold, font_size, font_italic, x, y, current_max_width, offset)
         cairo_restore(cr)
 
         if t >= 1 then
@@ -2408,12 +2469,12 @@ local function draw_meta_line_rich(cr, mail, x, y, force_scroll_active, dynamic_
             cairo_save(cr)
             cairo_rectangle(cr, x, y - font_size, current_max_width, font_size + (12 * GLOBAL_SCALE_FACTOR))
             cairo_clip(cr)
-            draw_meta_segments_scrolling(cr, segments, font_name, font_bold, font_size, font_italic, x, y, current_max_width, scroll_len)
+            draw_meta_segments_scrolling(cr, segments_to_draw, font_name, font_bold, font_size, font_italic, x, y, current_max_width, scroll_len)
             cairo_restore(cr)
         else
             state.rep = state.rep + 1
             if state.rep < scroll_repeat then
-                state.phase = "start"
+                state.phase = "start" -- WRACAMY DO START -> ZNOWU BĘDZIEMY AKTUALIZOWAĆ CZAS
                 state.start_time = now
             else
                 state.phase = "done"
@@ -2421,7 +2482,7 @@ local function draw_meta_line_rich(cr, mail, x, y, force_scroll_active, dynamic_
         end
 
     elseif phase == "done" then
-        draw_meta_segments_trimmed(cr, segments, font_name, font_bold, font_size, font_italic, x, y, current_max_width)
+        draw_meta_segments_trimmed(cr, segments_to_draw, font_name, font_bold, font_size, font_italic, x, y, current_max_width)
     end
 end
 
